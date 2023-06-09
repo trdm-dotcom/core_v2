@@ -1,0 +1,38 @@
+{
+  "name": "core_v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "run-local": "node build/src/index.js",
+    "build-local": "npm run build && node build/src/index.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/crypto-js": "^4.1.1",
+    "@types/mysql": "^2.15.21",
+    "@types/uuid": "^8.3.4",
+    "axios": "^0.27.2",
+    "common": "file:../common",
+    "crypto-js": "^4.1.1",
+    "dotenv": "^16.0.1",
+    "jackson-js": "^1.1.0",
+    "kafka-common": "file:../kafka-common",
+    "moment": "^2.29.4",
+    "mysql": "^2.18.1",
+    "redis": "^4.1.0",
+    "reflect-metadata": "^0.1.13",
+    "ts-node": "^10.7.0",
+    "tslib": "^2.4.0",
+    "typedi": "^0.10.0",
+    "typeorm": "^0.3.12",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^14.18.30",
+    "typescript": "^4.0.3"
+  }
+}
