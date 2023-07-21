@@ -8,7 +8,7 @@ export default class Post {
   userId: number;
   @Column({ name: 'path' })
   path: string;
-  @Column({ name: 'path' })
+  @Column({ name: 'disable' })
   disable: boolean;
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -31,6 +31,7 @@ export default class PostService {
     });
     return {};
   }
+  
   public async delete(request: IDeletePostRequest, transactionId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.post, 'post').setRequire().throwValid(invalidParams);
