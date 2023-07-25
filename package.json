@@ -14,6 +14,7 @@
   "dependencies": {
     "@types/crypto-js": "^4.1.1",
     "@types/mysql": "^2.15.21",
+    "@types/redis": "^4.0.11",
     "@types/uuid": "^8.3.4",
     "axios": "^0.27.2",
     "common": "file:../common",

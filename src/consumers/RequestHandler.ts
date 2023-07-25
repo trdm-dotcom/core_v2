@@ -6,6 +6,7 @@ import ReactionService from '../services/ReactionService';
 import { Kafka } from 'kafka-common';
 import { getInstance } from '../services/KafkaProducerService';
 import { MessageSetEntry } from 'kafka-common/build/src/modules/kafka';
+import ChatService from '../services/ChatService';
 
 @Service()
 export default class RequestHandler {
@@ -13,6 +14,8 @@ export default class RequestHandler {
   postService: PostService;
   @Inject()
   reactionService: ReactionService;
+  @Inject()
+  chatService: ChatService;
 
   public init() {
     const handle: Kafka.KafkaRequestHandler = new Kafka.KafkaRequestHandler(getInstance());
@@ -40,6 +43,18 @@ export default class RequestHandler {
 
         case 'post:/api/v1/social/reaction':
           return this.reactionService.reaction(message.data, message.messageId);
+
+        case 'post:api/v1/chat/message':
+          return this.chatService.sendMessage(message.data, message.messageId);
+
+        case 'get:api/v1/chat/room':
+          return this.chatService.getRooms(message.data, message.messageId);
+
+        case 'delete:api/v1/chat/room/{roomId}':
+          return this.chatService.deleteRoom(message.data, message.messageId);
+
+        case 'get:api/v1/chat/room/{roomId}/messages':
+          return this.chatService.getMessagesByRoomId(message.data, message.messageId);
 
         default:
           return false;

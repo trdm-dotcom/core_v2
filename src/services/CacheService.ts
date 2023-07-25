@@ -11,7 +11,7 @@ export default class CacheService {
   public async findInprogessValidate(key: any, type: string, transactionId: string | number) {
     Logger.info(`${transactionId} find inprogess type ${type} key ${key}`);
     let realKey: string = `${type}_${key}`;
-    return await this.redisService.get<any>(realKey);
+    return await this.redisService.get(realKey);
   }
 
   public addInprogessValidate(key: any, type: string, transactionId: string | number) {
@@ -23,6 +23,6 @@ export default class CacheService {
   public removeInprogessValidate(key: any, type: string, transactionId: string | number) {
     Logger.info(`${transactionId} remove inprogess type ${type} key ${key}`);
     let realKey: string = `${type}_${key}`;
-    this.redisService.set(realKey, '', { PX: -1 });
+    this.redisService.del(realKey);
   }
 }

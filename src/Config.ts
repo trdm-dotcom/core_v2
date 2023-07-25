@@ -48,6 +48,8 @@ let config = {
   app: {
     cacheTTL: 300000, //milliseconds
     timeStampHash: 30000, //milliseconds
+    defaultPageOffset: 0,
+    defaultPageSize: 20,
   },
   key: {
     rsa: {
