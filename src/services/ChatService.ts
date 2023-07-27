@@ -12,7 +12,7 @@ export default class ChatService {
   @Inject()
   private redisService: RedisService;
 
-  public async sendMessage(request: IChatRequest, transactionId: string | number) {
+  public async sendMessage(request: IChatRequest, transactionId: string | number, sourceId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.message, 'message').setRequire().throwValid(invalidParams);
     Utils.validate(request.roomId, 'roomId').setRequire().throwValid(invalidParams);
@@ -25,12 +25,19 @@ export default class ChatService {
       message: this.sanitise(request.message),
     };
     const userId = request.headers.token.userData.id;
+    if (!request.roomId.split(':').find((id) => Number(id) === userId)) {
+      throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
+    }
+    const partnerId = request.roomId.split(':').find((id) => Number(id) !== userId);
+    if (!(await this.redisService.exists(`user:${partnerId}`))) {
+      throw new Errors.GeneralError(Constants.INVALID_USER);
+    }
     const isPrivate = !(await this.redisService.exists(`${roomKey}:name`));
-    const roomExists = await this.redisService.sismember(`user:${userId}:rooms`, request.roomId);
-    if (roomExists && isPrivate) {
-      const partnerId = request.roomId.split(':').find((id) => Number(id) !== userId);
-      await this.redisService.sadd(`user:${userId}:rooms`, request.roomId);
-      await this.redisService.sadd(`user:${partnerId}:rooms`, request.roomId);
+    if (!(await await this.redisService.sismember(`user:${userId}:rooms`, request.roomId)) && isPrivate) {
+      this.redisService.sadd(`user:${userId}:rooms`, request.roomId);
+    }
+    if (!(await this.redisService.exists(`user:${partnerId}`)) && isPrivate) {
+      this.redisService.sadd(`user:${partnerId}:rooms`, request.roomId);
     }
     const roomHasMessages = await this.redisService.exists(roomKey);
     if (isPrivate && !roomHasMessages) {
@@ -39,10 +46,10 @@ export default class ChatService {
         id: message.roomId,
         names: await Promise.all(ids.map((id) => this.redisService.hmget(`user:${id}`, 'username'))),
       };
-      this.publish('show.room', msg);
+      this.publish('show.room', msg, sourceId);
     }
     this.redisService.zadd(roomKey, message.date, message);
-    this.publish('message', message);
+    this.publish('message', message, sourceId);
     return message;
   }
 
@@ -50,6 +57,10 @@ export default class ChatService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.roomId, 'roomId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
+    const userId = request.headers.token.userData.id;
+    if (!request.roomId.split(':').find((id) => Number(id) === userId)) {
+      throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
+    }
     try {
       const offset = request.offset ? +Math.max(request.offset, 0) : +config.app.defaultPageOffset;
       const size = request.size ? +Math.max(request.size, 0) : +config.app.defaultPageSize;
@@ -95,6 +106,9 @@ export default class ChatService {
     Utils.validate(request.roomId, 'roomId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId = request.headers.token.userData.id;
+    if (!request.roomId.split(':').find((id) => Number(id) === userId)) {
+      throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
+    }
     const roomExists = await this.redisService.exists(`room:${request.roomId}`);
     if (!roomExists) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
@@ -135,9 +149,9 @@ export default class ChatService {
     return sanitisedText;
   }
 
-  private publish(type, data) {
+  private publish(type, data, clientId) {
     const outgoing = {
-      clientId: config.clientId,
+      clientId: clientId,
       type: type,
       data: data,
     };

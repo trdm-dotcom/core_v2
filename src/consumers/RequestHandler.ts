@@ -44,16 +44,16 @@ export default class RequestHandler {
         case 'post:/api/v1/social/reaction':
           return this.reactionService.reaction(message.data, message.messageId);
 
-        case 'post:api/v1/chat/message':
-          return this.chatService.sendMessage(message.data, message.messageId);
+        case 'post:/api/v1/chat/message':
+          return this.chatService.sendMessage(message.data, message.messageId, message.sourceId);
 
-        case 'get:api/v1/chat/room':
+        case 'get:/api/v1/chat/room':
           return this.chatService.getRooms(message.data, message.messageId);
 
-        case 'delete:api/v1/chat/room/{roomId}':
+        case 'delete:/api/v1/chat/room/{roomId}':
           return this.chatService.deleteRoom(message.data, message.messageId);
 
-        case 'get:api/v1/chat/room/{roomId}/messages':
+        case 'get:/api/v1/chat/room/{roomId}/messages':
           return this.chatService.getMessagesByRoomId(message.data, message.messageId);
 
         default:
