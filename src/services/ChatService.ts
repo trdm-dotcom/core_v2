@@ -29,7 +29,10 @@ export default class ChatService {
       throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
     }
     const partnerId = request.roomId.split(':').find((id) => Number(id) !== userId);
-    if (!(await this.redisService.exists(`user:${partnerId}`))) {
+    if (
+      !(await this.redisService.exists(`user:${partnerId}`)) ||
+      !(await this.redisService.sismember(`user:${userId}:friends`, Number(partnerId)))
+    ) {
       throw new Errors.GeneralError(Constants.INVALID_USER);
     }
     const isPrivate = !(await this.redisService.exists(`${roomKey}:name`));
@@ -44,7 +47,7 @@ export default class ChatService {
       const ids = request.roomId.split(':');
       const msg = {
         id: message.roomId,
-        names: await Promise.all(ids.map((id) => this.redisService.hmget(`user:${id}`, 'username'))),
+        names: await Promise.all(ids.map((id) => this.redisService.hmget(`user:${id}`, 'name'))),
       };
       this.publish('show.room', msg, sourceId);
     }

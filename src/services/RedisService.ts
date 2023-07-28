@@ -298,10 +298,10 @@ export default class RedisService {
   }
 
   //Redis SREM command is used to remove the specified member from the set stored at the key.
-  public srem(key: string, member: string) {
+  public srem<T>(key: string, member: T) {
     return new Promise((resolve, reject) => {
       this.client
-        .sRem(key, member)
+        .sRem(key, this.formatDataRedis(member))
         .then((result: number) => {
           if (result == null) {
             resolve(null);
