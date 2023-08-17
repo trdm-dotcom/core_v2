@@ -8,6 +8,8 @@ import { getInstance } from '../services/KafkaProducerService';
 import { MessageSetEntry } from 'kafka-common/build/src/modules/kafka';
 import ChatService from '../services/ChatService';
 
+const { UriNotFound } = Errors;
+
 @Service()
 export default class RequestHandler {
   @Inject()
@@ -57,7 +59,7 @@ export default class RequestHandler {
           return this.chatService.getMessagesByRoomId(message.data, message.messageId);
 
         default:
-          return false;
+          throw new UriNotFound();
       }
     }
   };
