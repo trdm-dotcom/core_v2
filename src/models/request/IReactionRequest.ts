@@ -1,7 +1,6 @@
-import { IDataRequest } from "common/build/src/modules/models";
-import { ReactionType } from "../enum/ReactionType";
-
+import { IDataRequest } from 'common/build/src/modules/models';
+import { ObjectId } from 'mongodb';
 export interface IReactionRequest extends IDataRequest {
-  reaction?: ReactionType;
-  postId?: number;
+  reaction?: string;
+  postId?: ObjectId;
 }

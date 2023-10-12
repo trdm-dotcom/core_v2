@@ -1,18 +1,11 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { ReactionType } from '../enum/ReactionType';
+import { Column, CreateDateColumn, Entity } from 'typeorm';
 
 @Entity()
 export default class Reaction {
-  @PrimaryGeneratedColumn()
-  id: number;
-  @Column({ name: 'user_id' })
+  @Column()
   userId: number;
-  @Column({ name: 'post_id' })
-  postId: number;
-  @Column({ name: 'reaction' })
-  reaction: ReactionType;
-  @CreateDateColumn({ name: 'created_at' })
+  @Column()
+  reaction: string;
+  @CreateDateColumn()
   createdAt: Date;
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }

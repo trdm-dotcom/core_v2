@@ -1,17 +1,28 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { ObjectId } from 'mongodb';
+import { Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
+import Reaction from './Reaction';
+import Comment from './Comment';
 
 @Entity()
 export default class Post {
-  @PrimaryGeneratedColumn()
-  id: number;
-  @Column({ name: 'user_id' })
+  @ObjectIdColumn()
+  id: ObjectId;
+  @Column()
   userId: number;
-  @Column({ name: 'path' })
-  path: string;
-  @Column({ name: 'disable' })
+  @Column()
+  caption: string;
+  @Column()
+  source: string;
+  @Column()
   disable: boolean;
-  @CreateDateColumn({ name: 'created_at' })
+  @Column((type) => Comment, { array: true })
+  comments: Comment[];
+  @Column((type) => Reaction, { array: true })
+  reactions: Reaction[];
+  @Column((type) => Number, { array: true })
+  tags: number[];
+  @CreateDateColumn()
   createdAt: Date;
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
 }

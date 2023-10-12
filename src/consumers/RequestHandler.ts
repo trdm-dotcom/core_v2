@@ -2,11 +2,10 @@ import { Errors, Logger } from 'common';
 import { Inject, Service } from 'typedi';
 import config from '../Config';
 import PostService from '../services/PostService';
-import ReactionService from '../services/ReactionService';
 import { Kafka } from 'kafka-common';
 import { getInstance } from '../services/KafkaProducerService';
 import { MessageSetEntry } from 'kafka-common/build/src/modules/kafka';
-import ChatService from '../services/ChatService';
+import ConversationService from '../services/ConversationService';
 
 const { UriNotFound } = Errors;
 
@@ -15,9 +14,7 @@ export default class RequestHandler {
   @Inject()
   postService: PostService;
   @Inject()
-  reactionService: ReactionService;
-  @Inject()
-  chatService: ChatService;
+  conversationService: ConversationService;
 
   public init() {
     const handle: Kafka.KafkaRequestHandler = new Kafka.KafkaRequestHandler(getInstance());
@@ -25,6 +22,7 @@ export default class RequestHandler {
       handle.handle(message, this.handleRequest)
     );
   }
+
   private handleRequest: Kafka.Handle = async (message: Kafka.IMessage) => {
     Logger.info(`Endpoint received message: ${JSON.stringify(message)}`);
     if (message == null || message.data == null) {
@@ -32,31 +30,37 @@ export default class RequestHandler {
     } else {
       switch (message.uri) {
         case 'post:/api/v1/social/post':
-          return this.postService.store(message.data, message.messageId);
+          return this.postService.store(message.data, message.transactionId);
 
         case 'delete:/api/v1/social/post':
-          return this.postService.delete(message.data, message.messageId);
+          return this.postService.delete(message.data, message.transactionId);
 
         case 'put:/api/v1/social/post':
-          return this.postService.update(message.data, message.messageId);
+          return this.postService.update(message.data, message.transactionId);
+
+        case 'put:/api/v1/social/post/disable':
+          return this.postService.disable(message.data, message.transactionId);
 
         case 'post:/api/v1/social/comment':
-          return this.reactionService.comment(message.data, message.messageId);
+          return this.postService.comment(message.data, message.transactionId, message.sourceId);
 
         case 'post:/api/v1/social/reaction':
-          return this.reactionService.reaction(message.data, message.messageId);
+          return this.postService.reaction(message.data, message.transactionId, message.sourceId);
 
         case 'post:/api/v1/chat/message':
-          return this.chatService.sendMessage(message.data, message.messageId, message.sourceId);
+          return this.conversationService.sendMessage(message.data, message.sourceId, message.transactionId);
 
-        case 'get:/api/v1/chat/room':
-          return this.chatService.getRooms(message.data, message.messageId);
+        case 'get:/api/v1/chat/conversation':
+          return this.conversationService.getConversations(message.data, message.transactionId);
 
-        case 'delete:/api/v1/chat/room/{roomId}':
-          return this.chatService.deleteRoom(message.data, message.messageId);
+        case 'delete:/api/v1/chat/conversation/{roomId}':
+          return this.conversationService.deleteRoom(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/chat/room/{roomId}/messages':
-          return this.chatService.getMessagesByRoomId(message.data, message.messageId);
+        case 'get:/api/v1/chat/conversation/{roomId}/messages':
+          return this.conversationService.getMessagesByRoomId(message.data, message.transactionId);
+
+        case 'internal:/api/v1/conversation/deleteAll':
+          return this.conversationService.deleteAll(message.data, message.transactionId);
 
         default:
           throw new UriNotFound();

@@ -33,16 +33,16 @@ let config = {
   redis: {
     url: `redis://${Utils.getEnvStr('ENV_REDIS_HOST', 'localhost')}:${Utils.getEnvStr('ENV_REDIS_PORT', '6379')}`,
   },
-  datasource: {
-    host: Utils.getEnvStr('ENV_MYSQL_HOST', 'localhost'),
-    port: Utils.getEnvNum('ENV_MYSQL_PORT', 3306),
-    username: Utils.getEnvStr('ENV_MYSQL_USER', 'root'),
-    password: Utils.getEnvStr('ENV_MYSQL_PASSWORD', 'admin'),
-    database: 'core',
-    timezone: 'UTC',
+  mongo: {
+    host: Utils.getEnvStr('ENV_MONGO_HOST', 'localhost'),
+    port: Utils.getEnvNum('ENV_MONGO_PORT', 27017),
+    username: Utils.getEnvStr('ENV_MONGO_USER', null),
+    password: Utils.getEnvStr('ENV_MONGO_PASSWORD', null),
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
     synchronize: false,
-    logging: false,
-    poolSize: 10,
+    database: 'core',
+    poolSize: 100,
   },
   app: {
     cacheTTL: 300000, //milliseconds

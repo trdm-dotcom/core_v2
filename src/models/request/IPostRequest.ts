@@ -1,6 +1,10 @@
 import { IDataRequest } from 'common/build/src/modules/models';
+import { ObjectId } from 'mongodb';
 
 export default interface IPostRequest extends IDataRequest {
-  path?: string;
+  post?: ObjectId;
+  source?: string;
   hash?: string;
+  tags?: number[];
+  caption?: string;
 }

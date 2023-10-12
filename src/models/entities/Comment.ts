@@ -1,19 +1,18 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { ObjectId } from 'mongodb';
+import { Column, CreateDateColumn, Entity, ObjectIdColumn } from 'typeorm';
 
 @Entity()
 export default class Comment {
-  @PrimaryGeneratedColumn()
-  id: number;
-  @Column({ name: 'user_id' })
+  @ObjectIdColumn()
+  id: ObjectId;
+  @Column()
   userId: number;
-  @Column({ name: 'post_id' })
+  @Column()
   postId: number;
-  @Column({ name: 'comment' })
+  @Column()
   comment: string;
-  @Column({ name: 'comment_replied_id' })
-  commentRepliedId: number;
-  @CreateDateColumn({ name: 'created_at' })
+  @Column((type) => Comment)
+  commentReplies: Comment[];
+  @CreateDateColumn()
   createdAt: Date;
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }
