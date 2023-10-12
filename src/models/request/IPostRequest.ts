@@ -7,4 +7,6 @@ export default interface IPostRequest extends IDataRequest {
   hash?: string;
   tags?: number[];
   caption?: string;
+  pageSize?: number;
+  pageNumber?: number;
 }

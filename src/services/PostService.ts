@@ -15,6 +15,10 @@ import RedisService from './RedisService';
 import { ICommentRequest } from '../models/request/ICommentRequest';
 import Reaction from '../models/entities/Reaction';
 import Comment from '../models/entities/Comment';
+import { IPostCommentReactionRequest } from '../models/request/IPostCommentReactionRequest';
+import { IMessage } from 'kafka-common/build/src/modules/kafka';
+import { getInstance } from './KafkaProducerService';
+import { Kafka } from 'kafka-common';
 
 @Service()
 export default class PostService {
@@ -135,6 +139,56 @@ export default class PostService {
     return {};
   }
 
+  public async get(request: IPostRequest, transactionId: string | number) {
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    try {
+      const getFriendRequest = {
+        headers: request.headers,
+      };
+      const getFriendResponse: IMessage = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'user',
+        'internal:/api/v1/user/friends',
+        getFriendRequest
+      );
+      const friendsData = Kafka.getResponse<any[]>(getFriendResponse);
+      const mapUsers: Map<number, any> = new Map();
+      for (const friend of friendsData) {
+        mapUsers.set(friend.id, friend);
+      }
+      const posts: Post[] = await this.postRepository.find({
+        where: {
+          userId: { $in: Array.from(mapUsers.keys()) },
+          disable: false,
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+        skip: offset,
+        take: limit,
+      });
+      return posts.map((post: Post) => ({
+        id: post.id,
+        userId: post.userId,
+        source: post.source,
+        name: mapUsers.get(post.userId).name,
+        avatar: mapUsers.get(post.userId).avatar,
+        tags: post.tags.map((tag) => ({
+          id: tag,
+          name: mapUsers.get(tag).name,
+          avatar: mapUsers.get(tag).avatar,
+        })),
+        caption: post.caption,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+      }));
+    } catch (err) {
+      Logger.error(`${transactionId} fail to send message`, err);
+      throw new Errors.GeneralError();
+    }
+  }
+
   public async comment(request: ICommentRequest, transactionId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
@@ -230,6 +284,119 @@ export default class PostService {
     );
     this.publish('reaction', { postId: request.postId, reaction: request.reaction }, sourceId);
     return {};
+  }
+
+  public async getCommentsOfPost(request: IPostCommentReactionRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const post: Post = await this.postRepository.findOne({
+      where: {
+        _id: new ObjectId(request.postId),
+        disable: false,
+      },
+      select: ['comments'],
+    });
+    if (post == null) {
+      return [];
+    }
+    if (post.comments.length <= offset) {
+      return [];
+    }
+    const comments: Comment[] = post.comments.slice(offset, offset + limit);
+    const users: Set<number> = new Set();
+    comments.forEach((comment: Comment) => {
+      users.add(comment.userId);
+      if (comment.commentReplies && comment.commentReplies.length > 0) {
+        comment.commentReplies.forEach((reply) => users.add(reply.userId));
+      }
+    });
+    try {
+      const userInfosRequest = {
+        userIds: users,
+        headers: request.headers,
+      };
+      const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'user',
+        'internal:/api/v1/userInfos',
+        userInfosRequest
+      );
+      const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
+      const mapUserInfos: Map<number, any> = new Map();
+      userInfosData.forEach((info: any) => {
+        mapUserInfos.set(info.id, info);
+      });
+      return comments.map((comment: Comment) => ({
+        userId: comment.userId,
+        avatar: mapUserInfos.get(comment.userId).avatar,
+        name: mapUserInfos.get(comment.userId).name,
+        comment: comment.comment,
+        commentReplies: comment.commentReplies.map((reply) => ({
+          userId: reply.userId,
+          avatar: mapUserInfos.get(reply.userId).avatar,
+          name: mapUserInfos.get(reply.userId).name,
+          comment: reply.comment,
+        })),
+      }));
+    } catch (err) {
+      Logger.error(`${transactionId} fail to send message`, err);
+      throw new Errors.GeneralError();
+    }
+  }
+
+  public async getReactionsOfPost(request: IPostCommentReactionRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const post: Post = await this.postRepository.findOne({
+      where: {
+        _id: new ObjectId(request.postId),
+        disable: false,
+      },
+      select: ['comments'],
+    });
+    if (post == null) {
+      return [];
+    }
+    if (post.reactions.length <= offset) {
+      return [];
+    }
+    const reactions: Reaction[] = post.reactions.slice(offset, offset + limit);
+    const users: Set<number> = new Set();
+    reactions.forEach((reaction: Reaction) => {
+      users.add(reaction.userId);
+    });
+    try {
+      const userInfosRequest = {
+        userIds: users,
+        headers: request.headers,
+      };
+      const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'user',
+        'internal:/api/v1/userInfos',
+        userInfosRequest
+      );
+      const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
+      const mapUserInfos: Map<number, any> = new Map();
+      userInfosData.forEach((info: any) => {
+        mapUserInfos.set(info.id, info);
+      });
+      return reactions.map((reaction: Reaction) => ({
+        userId: reaction.userId,
+        avatar: mapUserInfos.get(reaction.userId).avatar,
+        name: mapUserInfos.get(reaction.userId).name,
+        reaction: reaction.reaction,
+      }));
+    } catch (err) {
+      Logger.error(`${transactionId} fail to send message`, err);
+      throw new Errors.GeneralError();
+    }
   }
 
   private sanitise(text: string) {

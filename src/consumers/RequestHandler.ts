@@ -37,6 +37,9 @@ export default class RequestHandler {
 
         case 'put:/api/v1/social/post':
           return this.postService.update(message.data, message.transactionId);
+        
+        case 'get:/api/v1/social/post':
+          return this.postService.get(message.data, message.transactionId);
 
         case 'put:/api/v1/social/post/disable':
           return this.postService.disable(message.data, message.transactionId);
@@ -44,8 +47,14 @@ export default class RequestHandler {
         case 'post:/api/v1/social/comment':
           return this.postService.comment(message.data, message.transactionId, message.sourceId);
 
+        case 'get:/api/v1/social/comment':
+          return this.postService.getCommentsOfPost(message.data, message.transactionId);
+
         case 'post:/api/v1/social/reaction':
           return this.postService.reaction(message.data, message.transactionId, message.sourceId);
+
+        case 'get:/api/v1/social/reaction':
+          return this.postService.getReactionsOfPost(message.data, message.transactionId);
 
         case 'post:/api/v1/chat/message':
           return this.conversationService.sendMessage(message.data, message.sourceId, message.transactionId);
