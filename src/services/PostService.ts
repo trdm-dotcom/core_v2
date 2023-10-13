@@ -181,7 +181,6 @@ export default class PostService {
         })),
         caption: post.caption,
         createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
       }));
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
@@ -330,6 +329,7 @@ export default class PostService {
         mapUserInfos.set(info.id, info);
       });
       return comments.map((comment: Comment) => ({
+        postId: request.postId,
         userId: comment.userId,
         avatar: mapUserInfos.get(comment.userId).avatar,
         name: mapUserInfos.get(comment.userId).name,
@@ -340,6 +340,7 @@ export default class PostService {
           name: mapUserInfos.get(reply.userId).name,
           comment: reply.comment,
         })),
+        createdAt: comment.createdAt,
       }));
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
@@ -388,10 +389,12 @@ export default class PostService {
         mapUserInfos.set(info.id, info);
       });
       return reactions.map((reaction: Reaction) => ({
+        postId: request.postId,
         userId: reaction.userId,
         avatar: mapUserInfos.get(reaction.userId).avatar,
         name: mapUserInfos.get(reaction.userId).name,
         reaction: reaction.reaction,
+        createdAt: reaction.createdAt,
       }));
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
