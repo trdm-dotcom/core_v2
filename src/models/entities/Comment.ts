@@ -1,10 +1,9 @@
-import { ObjectId } from 'mongodb';
-import { Column, CreateDateColumn, Entity, ObjectIdColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
 
 @Entity()
 export default class Comment {
   @ObjectIdColumn()
-  id: ObjectId;
+  id: ObjectID;
   @Column()
   userId: number;
   @Column()

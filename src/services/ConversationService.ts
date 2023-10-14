@@ -5,13 +5,12 @@ import { getInstance } from './KafkaProducerService';
 import { IMessage } from 'kafka-common/build/src/modules/kafka';
 import { Kafka } from 'kafka-common';
 import Constants from '../Constants';
-import { MongoRepository } from 'typeorm';
+import { MongoRepository, ObjectID } from 'typeorm';
 import Conversation from '../models/entities/Conversation';
 import { Message } from '../models/entities/Message';
 import RedisService from './RedisService';
 import { InjectRepository } from 'typeorm-typedi-extensions';
 import { FirebaseType, IDataRequest } from 'common/build/src/modules/models';
-import { ObjectId } from 'mongodb';
 import * as utils from '../utils/Utils';
 
 @Service()
@@ -46,7 +45,7 @@ export default class ConversationService {
       throw new Errors.GeneralError();
     }
     if (!data.isFriend) {
-      throw new Errors.GeneralError(Constants.WAS_BLOCKED);
+      throw new Errors.GeneralError(Constants.CANT_SEND_MESSAGE);
     }
     let conversation: Conversation = await this.repository.findOne({
       where: {
@@ -67,7 +66,7 @@ export default class ConversationService {
     message.createdAt = now;
     await this.repository.updateOne(
       {
-        _id: conversation.id,
+        id: conversation.id,
       },
       {
         $push: {
@@ -144,12 +143,9 @@ export default class ConversationService {
     if (conversations.length <= 0) {
       return [];
     }
-    const mapConversations: Map<number, Conversation> = new Map();
-    const users: number[] = [];
+    const users: Set<number> = new Set<number>();
     conversations.forEach((conversation: Conversation) => {
-      const user: number = conversation.users.find((user: number) => user !== userId);
-      users.push(user);
-      mapConversations.set(user, conversation);
+      conversation.users.forEach((user) => users.add(user));
     });
     const userInfosRequest = {
       userIds: users,
@@ -163,12 +159,21 @@ export default class ConversationService {
         userInfosRequest
       );
       const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
-      return userInfosData.map((info: any) => {
-        const conversation: Conversation = mapConversations.get(info.id);
+      const mapUserInfos: Map<number, any> = new Map();
+      userInfosData.forEach((info: any) => {
+        mapUserInfos.set(info.id, info);
+      });
+      return conversations.map((conversation: Conversation) => {
+        const userInfos: any[] = [];
+        conversation.users.forEach((userId) => {
+          const info: any = mapUserInfos.get(userId);
+          if (info != null) {
+            userInfos.push(info);
+          }
+        });
         return {
           id: conversation.id,
-          name: info.name,
-          avatar: info.avatar,
+          users: userInfos,
           lastMessage: conversation.messages[conversation.messages.length - 1],
         };
       });
@@ -180,44 +185,74 @@ export default class ConversationService {
 
   public async deleteRoom(request: IChatRequest, msgId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
-    Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.chatId, 'chatId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
+        id: ObjectID.createFromHexString(request.chatId),
         users: {
-          $all: [userId, request.recipientId],
+          $all: [userId],
         },
       },
     });
     if (conversation == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    await this.repository.deleteOne({ _id: new ObjectId(conversation.id) });
+    await this.repository.deleteOne({ id: conversation.id });
     this.publish('delete.room', { id: conversation.id }, sourceId);
     return {};
   }
 
   public async getMessagesByRoomId(request: IChatRequest, msgId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
-    Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.chatId, 'chatId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
+        id: ObjectID.createFromHexString(request.chatId),
         users: {
-          $all: [userId, request.recipientId],
+          $all: [userId],
         },
       },
     });
     if (conversation == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    return conversation.messages.map((message: Message) => ({
-      message: message.message,
-      createdAt: message.createdAt,
-      userId: message.userId,
-    }));
+    const users: Set<number> = new Set<number>();
+    conversation.users.forEach((user) => users.add(user));
+    try {
+      const userInfosRequest = {
+        userIds: users,
+        headers: request.headers,
+      };
+      const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
+        `${msgId}`,
+        'user',
+        'internal:/api/v1/userInfos',
+        userInfosRequest
+      );
+      const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
+      const mapUserInfos: Map<number, any> = new Map();
+      userInfosData.forEach((info: any) => {
+        mapUserInfos.set(info.id, info);
+      });
+      const messages = conversation.messages.slice(offset, offset + limit);
+      return messages.map((message: Message) => ({
+        id: message.id,
+        userId: message.userId,
+        avatar: mapUserInfos.get(message.userId).avatar,
+        name: mapUserInfos.get(message.userId).name,
+        message: message.message,
+        createdAt: message.createdAt,
+      }));
+    } catch (err) {
+      Logger.error(`${msgId} fail to send message`, err);
+      throw new Errors.GeneralError();
+    }
   }
 
   public async deleteAll(request: IDataRequest, msgId: string | number) {
@@ -244,4 +279,6 @@ export default class ConversationService {
     };
     this.redisService.publish('core', outgoing);
   }
+
+  public async seenMessage(request: IChatRequest, msgId: string | number) {}
 }

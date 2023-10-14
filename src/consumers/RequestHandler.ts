@@ -37,7 +37,7 @@ export default class RequestHandler {
 
         case 'put:/api/v1/social/post':
           return this.postService.update(message.data, message.transactionId);
-        
+
         case 'get:/api/v1/social/post':
           return this.postService.get(message.data, message.transactionId);
 
@@ -47,13 +47,16 @@ export default class RequestHandler {
         case 'post:/api/v1/social/comment':
           return this.postService.comment(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/social/comment':
+        case 'get:/api/v1/social/post/{postId}/comments':
           return this.postService.getCommentsOfPost(message.data, message.transactionId);
+
+        case 'delete:/api/v1/social/post/{postId}/comments/{commentId}':
+          return this.postService.deleteComment(message.data, message.transactionId);
 
         case 'post:/api/v1/social/reaction':
           return this.postService.reaction(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/social/reaction':
+        case 'get:/api/v1/social/post/{postId}/reaction':
           return this.postService.getReactionsOfPost(message.data, message.transactionId);
 
         case 'post:/api/v1/chat/message':

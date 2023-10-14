@@ -4,11 +4,10 @@ import Post from '../models/entities/Post';
 import { Errors, Logger, Utils } from 'common';
 import * as utils from '../utils/Utils';
 import IDeletePostRequest from '../models/request/IDeletePostRequest';
-import { MongoRepository } from 'typeorm';
+import { MongoRepository, ObjectID } from 'typeorm';
 import CacheService from './CacheService';
 import Constants from '../Constants';
 import { InjectRepository } from 'typeorm-typedi-extensions';
-import { ObjectId } from 'mongodb';
 import { FirebaseType } from 'common/build/src/modules/models';
 import { IReactionRequest } from '../models/request/IReactionRequest';
 import RedisService from './RedisService';
@@ -53,7 +52,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.post),
+        id: ObjectID.createFromHexString(request.post),
         userId: userId,
       },
     });
@@ -68,7 +67,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.delete({ id: new ObjectId(post.id) });
+      await this.postRepository.delete({ id: post.id });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -84,7 +83,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.post),
+        id: ObjectID.createFromHexString(request.post),
         userId: userId,
       },
     });
@@ -99,7 +98,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update({ id: new ObjectId(post.id) }, { disable: true });
+      await this.postRepository.update({ id: post.id }, { disable: true });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -114,7 +113,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.post),
+        id: ObjectID.createFromHexString(request.post),
         userId: userId,
       },
     });
@@ -132,7 +131,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update(new ObjectId(post.id), { caption: request.caption, tags: request.tags });
+      await this.postRepository.update({ id: post.id }, { caption: request.caption, tags: request.tags });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'MODIFY_POST', transactionId);
     }
@@ -198,7 +197,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.postId),
+        id: ObjectID.createFromHexString(request.postId),
         disable: true,
       },
     });
@@ -206,22 +205,22 @@ export default class PostService {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
     let comment: Comment;
-    if (request.replyId != null) {
-      comment = post.comments.find((comment) => comment.id.equals(request.replyId));
+    if (request.commentId != null) {
+      comment = post.comments.find((comment) => comment.id === ObjectID.createFromHexString(request.commentId));
       const replyComment: Comment = new Comment();
-      replyComment.id = new ObjectId();
+      replyComment.id = new ObjectID();
       replyComment.userId = request.headers.token.userData.id;
       replyComment.comment = this.sanitise(request.comment);
       comment.commentReplies.push(replyComment);
     } else {
       comment = new Comment();
-      comment.id = new ObjectId();
+      comment.id = new ObjectID();
       comment.userId = request.headers.token.userData.id;
       comment.comment = this.sanitise(request.comment);
     }
     this.postRepository.updateOne(
       {
-        _id: new ObjectId(post.id),
+        id: post.id,
       },
       {
         $push: {
@@ -252,7 +251,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.postId),
+        id: ObjectID.createFromHexString(request.postId),
         disable: true,
       },
     });
@@ -264,7 +263,7 @@ export default class PostService {
     reaction.reaction = request.reaction;
     this.postRepository.updateOne(
       {
-        _id: new ObjectId(post.id),
+        id: post.id,
       },
       {
         $push: {
@@ -293,7 +292,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.postId),
+        id: ObjectID.createFromHexString(request.postId),
         disable: false,
       },
       select: ['comments'],
@@ -348,6 +347,32 @@ export default class PostService {
     }
   }
 
+  public async deleteComment(request: ICommentRequest, transactionId: string | number) {
+    const post: Post = await this.postRepository.findOne({
+      where: {
+        id: ObjectID.createFromHexString(request.postId),
+        disable: true,
+      },
+    });
+    if (post == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
+    const comment: Comment = post.comments.find(
+      (comment) => comment.id === ObjectID.createFromHexString(request.commentId)
+    );
+    if (comment == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
+    if (comment.userId != request.headers.token.userData.id) {
+      throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
+    }
+    await this.postRepository.updateOne(
+      { id: post.id },
+      { $pull: { comments: { id: ObjectID.createFromHexString(request.commentId) } } }
+    );
+    return {};
+  }
+
   public async getReactionsOfPost(request: IPostCommentReactionRequest, transactionId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
@@ -356,7 +381,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        _id: new ObjectId(request.postId),
+        id: ObjectID.createFromHexString(request.postId),
         disable: false,
       },
       select: ['comments'],

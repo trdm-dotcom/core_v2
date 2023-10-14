@@ -1,17 +1,18 @@
-import { ObjectId } from 'mongodb';
-import { Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
 import { Message } from './Message';
 
 @Entity()
 export default class Conversation {
   @ObjectIdColumn()
-  id: ObjectId;
+  id: ObjectID;
   @Column()
   group: boolean;
   @Column({ array: true })
   users: number[];
   @Column((type) => Message, { array: true })
   messages: Message[];
+  @Column()
+  seen: boolean;
   @CreateDateColumn()
   createdAt: Date;
   @UpdateDateColumn()

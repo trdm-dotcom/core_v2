@@ -1,12 +1,11 @@
-import { ObjectId } from 'mongodb';
-import { Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
 import Reaction from './Reaction';
 import Comment from './Comment';
 
 @Entity()
 export default class Post {
   @ObjectIdColumn()
-  id: ObjectId;
+  id: ObjectID;
   @Column()
   userId: number;
   @Column()
