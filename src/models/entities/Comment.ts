@@ -1,6 +1,18 @@
-import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  ObjectID,
+  ObjectIdColumn,
+  Tree,
+  TreeChildren,
+  TreeParent,
+} from 'typeorm';
+import Post from './Post';
 
 @Entity()
+@Tree('nested-set')
 export default class Comment {
   @ObjectIdColumn()
   id: ObjectID;
@@ -10,8 +22,12 @@ export default class Comment {
   postId: number;
   @Column()
   comment: string;
-  @Column((type) => Comment)
-  commentReplies: Comment[];
+  @TreeChildren()
+  children: Comment[];
+  @TreeParent()
+  parent: Comment;
+  @ManyToOne(() => Post, (post) => post.comments)
+  post: Post;
   @CreateDateColumn()
   createdAt: Date;
 }

@@ -211,11 +211,14 @@ export default class PostService {
       replyComment.id = new ObjectID();
       replyComment.userId = request.headers.token.userData.id;
       replyComment.comment = this.sanitise(request.comment);
-      comment.commentReplies.push(replyComment);
+      replyComment.parent = comment;
+      replyComment.post = post;
+      comment.children.push(replyComment);
     } else {
       comment = new Comment();
       comment.id = new ObjectID();
       comment.userId = request.headers.token.userData.id;
+      comment.post = post;
       comment.comment = this.sanitise(request.comment);
     }
     this.postRepository.updateOne(
@@ -261,6 +264,7 @@ export default class PostService {
     const reaction: Reaction = new Reaction();
     reaction.userId = request.headers.token.userData.id;
     reaction.reaction = request.reaction;
+    reaction.post = post;
     this.postRepository.updateOne(
       {
         id: post.id,
@@ -307,9 +311,7 @@ export default class PostService {
     const users: Set<number> = new Set();
     comments.forEach((comment: Comment) => {
       users.add(comment.userId);
-      if (comment.commentReplies && comment.commentReplies.length > 0) {
-        comment.commentReplies.forEach((reply) => users.add(reply.userId));
-      }
+      comment.children.forEach((reply) => users.add(reply.userId));
     });
     try {
       const userInfosRequest = {
@@ -333,7 +335,7 @@ export default class PostService {
         avatar: mapUserInfos.get(comment.userId).avatar,
         name: mapUserInfos.get(comment.userId).name,
         comment: comment.comment,
-        commentReplies: comment.commentReplies.map((reply) => ({
+        commentReplies: comment.children.map((reply) => ({
           userId: reply.userId,
           avatar: mapUserInfos.get(reply.userId).avatar,
           name: mapUserInfos.get(reply.userId).name,

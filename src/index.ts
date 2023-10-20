@@ -9,6 +9,8 @@ import { createConnection, useContainer } from 'typeorm';
 import { Container as ContainerTypeOrm } from 'typeorm-typedi-extensions';
 import Post from './models/entities/Post';
 import Conversation from './models/entities/Conversation';
+import Reaction from './models/entities/Reaction';
+import Comment from './models/entities/Comment';
 
 Logger.create(config.logger.config, true);
 Logger.info('Starting...');
@@ -19,7 +21,7 @@ async function run() {
   await createConnection({
     ...{
       type: 'mongodb',
-      entities: [Post, Conversation],
+      entities: [Post, Conversation, Comment, Reaction],
     },
     ...config.mongo,
   });
