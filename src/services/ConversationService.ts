@@ -179,7 +179,7 @@ export default class ConversationService {
       });
     } catch (err) {
       Logger.error(`${msgId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      return [];
     }
   }
 
@@ -251,7 +251,7 @@ export default class ConversationService {
       }));
     } catch (err) {
       Logger.error(`${msgId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      return [];
     }
   }
 

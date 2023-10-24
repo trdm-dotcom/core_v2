@@ -4,7 +4,7 @@ import Post from '../models/entities/Post';
 import { Errors, Logger, Utils } from 'common';
 import * as utils from '../utils/Utils';
 import IDeletePostRequest from '../models/request/IDeletePostRequest';
-import { MongoRepository, ObjectID } from 'typeorm';
+import { MongoRepository } from 'typeorm';
 import CacheService from './CacheService';
 import Constants from '../Constants';
 import { InjectRepository } from 'typeorm-typedi-extensions';
@@ -18,6 +18,7 @@ import { IPostCommentReactionRequest } from '../models/request/IPostCommentReact
 import { IMessage } from 'kafka-common/build/src/modules/kafka';
 import { getInstance } from './KafkaProducerService';
 import { Kafka } from 'kafka-common';
+import { ObjectID } from 'mongodb';
 
 @Service()
 export default class PostService {
@@ -39,6 +40,9 @@ export default class PostService {
     post.disable = false;
     post.source = request.source;
     post.tags = request.tags;
+    post.caption = request.caption;
+    post.reactions = [];
+    post.comments = [];
     await this.postRepository.save(post);
     return {};
   }
@@ -52,7 +56,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.post),
+        id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -67,7 +71,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.delete({ id: post.id });
+      await this.postRepository.delete({ id: new ObjectID(request.post) });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -83,7 +87,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.post),
+        id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -98,7 +102,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update({ id: post.id }, { disable: true });
+      await this.postRepository.update({ id: new ObjectID(request.post) }, { disable: true });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -113,7 +117,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.post),
+        id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -131,7 +135,10 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update({ id: post.id }, { caption: request.caption, tags: request.tags });
+      await this.postRepository.update(
+        { id: new ObjectID(request.post) },
+        { caption: request.caption, tags: request.tags }
+      );
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'MODIFY_POST', transactionId);
     }
@@ -141,6 +148,7 @@ export default class PostService {
   public async get(request: IPostRequest, transactionId: string | number) {
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const userId = request.headers.token.userData.id;
     try {
       const getFriendRequest = {
         headers: request.headers,
@@ -152,13 +160,15 @@ export default class PostService {
         getFriendRequest
       );
       const friendsData = Kafka.getResponse<any[]>(getFriendResponse);
-      const mapUsers: Map<number, any> = new Map();
-      for (const friend of friendsData) {
+      const setUserIds: Set<number> = new Set([userId]);
+      const mapUsers: Map<number, any> = new Map([[userId, request.headers.token.userData]]);
+      friendsData.forEach((friend) => {
         mapUsers.set(friend.id, friend);
-      }
+        setUserIds.add(friend.id);
+      });
       const posts: Post[] = await this.postRepository.find({
         where: {
-          userId: { $in: Array.from(mapUsers.keys()) },
+          userId: { $in: Array.from(setUserIds) },
           disable: false,
         },
         order: {
@@ -167,23 +177,34 @@ export default class PostService {
         skip: offset,
         take: limit,
       });
-      return posts.map((post: Post) => ({
-        id: post.id,
-        userId: post.userId,
-        source: post.source,
-        name: mapUsers.get(post.userId).name,
-        avatar: mapUsers.get(post.userId).avatar,
-        tags: post.tags.map((tag) => ({
-          id: tag,
-          name: mapUsers.get(tag).name,
-          avatar: mapUsers.get(tag).avatar,
-        })),
-        caption: post.caption,
-        createdAt: post.createdAt,
-      }));
+      return posts.map((post: Post) => {
+        const author = mapUsers.get(post.userId);
+        const tags = post.tags
+          ? post.tags.map((tag) => ({
+              id: tag,
+              name: mapUsers.get(tag).name,
+              avatar: mapUsers.get(tag).avatar,
+            }))
+          : [];
+
+        return {
+          id: post.id,
+          source: post.source,
+          author: {
+            name: author?.name,
+            avatar: author?.avatar,
+            userId: post.userId,
+          },
+          tags: tags,
+          caption: post.caption,
+          createdAt: post.createdAt,
+          reactions: post.reactions ? post.reactions : [],
+          comments: post.comments ? post.comments : [],
+        };
+      });
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      return [];
     }
   }
 
@@ -197,7 +218,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.postId),
+        id: new ObjectID(request.postId),
         disable: true,
       },
     });
@@ -206,7 +227,7 @@ export default class PostService {
     }
     let comment: Comment;
     if (request.commentId != null) {
-      comment = post.comments.find((comment) => comment.id === ObjectID.createFromHexString(request.commentId));
+      comment = post.comments.find((comment) => comment.id === new ObjectID(request.commentId));
       const replyComment: Comment = new Comment();
       replyComment.id = new ObjectID();
       replyComment.userId = request.headers.token.userData.id;
@@ -254,7 +275,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.postId),
+        id: new ObjectID(request.postId),
         disable: true,
       },
     });
@@ -267,7 +288,7 @@ export default class PostService {
     reaction.post = post;
     this.postRepository.updateOne(
       {
-        id: post.id,
+        id: new ObjectID(request.postId),
       },
       {
         $push: {
@@ -296,7 +317,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.postId),
+        id: new ObjectID(request.postId),
         disable: false,
       },
       select: ['comments'],
@@ -345,23 +366,21 @@ export default class PostService {
       }));
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      return [];
     }
   }
 
   public async deleteComment(request: ICommentRequest, transactionId: string | number) {
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.postId),
+        id: new ObjectID(request.postId),
         disable: true,
       },
     });
     if (post == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    const comment: Comment = post.comments.find(
-      (comment) => comment.id === ObjectID.createFromHexString(request.commentId)
-    );
+    const comment: Comment = post.comments.find((comment) => comment.id === new ObjectID(request.commentId));
     if (comment == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
@@ -370,7 +389,7 @@ export default class PostService {
     }
     await this.postRepository.updateOne(
       { id: post.id },
-      { $pull: { comments: { id: ObjectID.createFromHexString(request.commentId) } } }
+      { $pull: { comments: { id: new ObjectID(request.commentId) } } }
     );
     return {};
   }
@@ -383,7 +402,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.postId),
+        id: new ObjectID(request.postId),
         disable: false,
       },
       select: ['comments'],
@@ -425,7 +444,7 @@ export default class PostService {
       }));
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      return [];
     }
   }
 

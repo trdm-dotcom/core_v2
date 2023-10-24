@@ -47,16 +47,16 @@ export default class RequestHandler {
         case 'post:/api/v1/social/comment':
           return this.postService.comment(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/social/post/{postId}/comments':
+        case 'get:/api/v1/social/post/comments':
           return this.postService.getCommentsOfPost(message.data, message.transactionId);
 
-        case 'delete:/api/v1/social/post/{postId}/comments/{commentId}':
+        case 'delete:/api/v1/social/post/comments':
           return this.postService.deleteComment(message.data, message.transactionId);
 
         case 'post:/api/v1/social/reaction':
           return this.postService.reaction(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/social/post/{postId}/reaction':
+        case 'get:/api/v1/social/post/reactions':
           return this.postService.getReactionsOfPost(message.data, message.transactionId);
 
         case 'post:/api/v1/chat/message':
@@ -65,10 +65,10 @@ export default class RequestHandler {
         case 'get:/api/v1/chat/conversation':
           return this.conversationService.getConversations(message.data, message.transactionId);
 
-        case 'delete:/api/v1/chat/conversation/{roomId}':
+        case 'delete:/api/v1/chat/conversation':
           return this.conversationService.deleteRoom(message.data, message.transactionId, message.sourceId);
 
-        case 'get:/api/v1/chat/conversation/{roomId}/messages':
+        case 'get:/api/v1/chat/conversation/messages':
           return this.conversationService.getMessagesByRoomId(message.data, message.transactionId);
 
         case 'internal:/api/v1/conversation/deleteAll':

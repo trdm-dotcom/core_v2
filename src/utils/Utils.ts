@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { privateDecrypt, publicEncrypt } from 'crypto';
-import { Errors, Models, Logger } from 'common';
+import { Errors, Models } from 'common';
 import config from '../Config';
 import { AES, enc, pad, mode } from 'crypto-js';
 import * as moment from 'moment';
@@ -123,12 +123,5 @@ export function validHash(hash: string, type: string) {
     moment().isBefore(moment(Number(mapHashObject.get('timeStamp'))))
   ) {
     throw new Errors.GeneralError('INVALID_HASH');
-  }
-  Logger.info('test check point', mapHashObject);
-  if (
-    moment.duration(moment().diff(moment(Number(mapHashObject.get('timeStamp'))))).asMilliseconds() <
-    config.app.timeStampHash
-  ) {
-    throw new Errors.GeneralError('TO_FAST');
   }
 }
