@@ -11,6 +11,7 @@ import Post from './models/entities/Post';
 import Conversation from './models/entities/Conversation';
 import Reaction from './models/entities/Reaction';
 import Comment from './models/entities/Comment';
+import { Message } from './models/entities/Message';
 
 Logger.create(config.logger.config, true);
 Logger.info('Starting...');
@@ -21,7 +22,7 @@ async function run() {
   await createConnection({
     ...{
       type: 'mongodb',
-      entities: [Post, Conversation, Comment, Reaction],
+      entities: [Post, Conversation, Comment, Reaction, Message],
     },
     ...config.mongo,
   });

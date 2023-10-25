@@ -56,7 +56,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.post),
+        _id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -71,7 +71,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.delete({ id: new ObjectID(request.post) });
+      await this.postRepository.delete(post.id);
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -87,7 +87,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.post),
+        _id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -102,7 +102,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update({ id: new ObjectID(request.post) }, { disable: true });
+      await this.postRepository.updateOne(post.id, { disable: true });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -117,7 +117,7 @@ export default class PostService {
     const userId = request.headers.token.userData.id;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.post),
+        _id: new ObjectID(request.post),
         userId: userId,
       },
     });
@@ -135,10 +135,7 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update(
-        { id: new ObjectID(request.post) },
-        { caption: request.caption, tags: request.tags }
-      );
+      await this.postRepository.update(post.id, { caption: request.caption, tags: request.tags });
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'MODIFY_POST', transactionId);
     }
@@ -218,7 +215,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.postId),
+        _id: new ObjectID(request.postId),
         disable: true,
       },
     });
@@ -242,16 +239,11 @@ export default class PostService {
       comment.post = post;
       comment.comment = this.sanitise(request.comment);
     }
-    this.postRepository.updateOne(
-      {
-        id: post.id,
+    this.postRepository.updateOne(post.id, {
+      $push: {
+        comments: comment,
       },
-      {
-        $push: {
-          comments: comment,
-        },
-      }
-    );
+    });
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
@@ -275,7 +267,7 @@ export default class PostService {
     }
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.postId),
+        _id: new ObjectID(request.postId),
         disable: true,
       },
     });
@@ -286,16 +278,11 @@ export default class PostService {
     reaction.userId = request.headers.token.userData.id;
     reaction.reaction = request.reaction;
     reaction.post = post;
-    this.postRepository.updateOne(
-      {
-        id: new ObjectID(request.postId),
+    this.postRepository.updateOne(post.id, {
+      $push: {
+        reactions: reaction,
       },
-      {
-        $push: {
-          reactions: reaction,
-        },
-      }
-    );
+    });
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
@@ -317,7 +304,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.postId),
+        _id: new ObjectID(request.postId),
         disable: false,
       },
       select: ['comments'],
@@ -373,7 +360,7 @@ export default class PostService {
   public async deleteComment(request: ICommentRequest, transactionId: string | number) {
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.postId),
+        _id: new ObjectID(request.postId),
         disable: true,
       },
     });
@@ -387,10 +374,7 @@ export default class PostService {
     if (comment.userId != request.headers.token.userData.id) {
       throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
     }
-    await this.postRepository.updateOne(
-      { id: post.id },
-      { $pull: { comments: { id: new ObjectID(request.commentId) } } }
-    );
+    await this.postRepository.updateOne(post.id, { $pull: { comments: { id: new ObjectID(request.commentId) } } });
     return {};
   }
 
@@ -402,7 +386,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
-        id: new ObjectID(request.postId),
+        _id: new ObjectID(request.postId),
         disable: false,
       },
       select: ['comments'],

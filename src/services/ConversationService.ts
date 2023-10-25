@@ -64,6 +64,7 @@ export default class ConversationService {
     message.userId = userId;
     message.message = this.sanitise(request.message);
     message.createdAt = now;
+    message.conversation = conversation;
     await this.repository.updateOne(
       {
         id: conversation.id,

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, OneToMany, UpdateDateColumn } from 'typeorm';
 import { Message } from './Message';
 
 @Entity()
@@ -9,7 +9,7 @@ export default class Conversation {
   group: boolean;
   @Column({ array: true })
   users: number[];
-  @Column((type) => Message, { array: true })
+  @OneToMany(() => Message, (message) => message.conversation)
   messages: Message[];
   @Column()
   seen: boolean;
