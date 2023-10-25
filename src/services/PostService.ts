@@ -210,6 +210,8 @@ export default class PostService {
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
     Utils.validate(request.comment, 'comment').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
+    const name = request.headers.token.userData.name;
+    const userId = request.headers.token.userData.id;
     while (await this.cacheService.findInprogessValidate(request.postId, 'DELETE_DISABLE_POST', transactionId)) {
       Logger.warn(`${transactionId} waiting do progess`);
     }
@@ -247,11 +249,14 @@ export default class PostService {
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
-      `${request.headers.token.userData.id} comment on your post`,
-      this.sanitise(request.comment),
+      `${name} comment on your post`,
       'push_up',
+      FirebaseType.TOKEN,
       true,
-      FirebaseType.TOKEN
+      null,
+      'COMMENT',
+      post.id.toHexString(),
+      userId
     );
     this.publish('comment', { postId: request.postId, comment: request.comment }, sourceId);
     return {};
@@ -262,6 +267,8 @@ export default class PostService {
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
     Utils.validate(request.reaction, 'reaction').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
+    const name = request.headers.token.userData.name;
+    const userId = request.headers.token.userData.id;
     while (await this.cacheService.findInprogessValidate(request.postId, 'DELETE_DISABLE_POST', transactionId)) {
       Logger.warn(`${transactionId} waiting do progess`);
     }
@@ -286,11 +293,14 @@ export default class PostService {
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
-      `${request.headers.token.userData.id} reaction on your post`,
-      '',
+      `${name} like on your post`,
       'push_up',
+      FirebaseType.TOKEN,
       true,
-      FirebaseType.TOKEN
+      null,
+      'LIKE',
+      post.id.toHexString(),
+      userId
     );
     this.publish('reaction', { postId: request.postId, reaction: request.reaction }, sourceId);
     return {};

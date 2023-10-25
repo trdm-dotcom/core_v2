@@ -27,6 +27,7 @@ export default class ConversationService {
     Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
+    const name: string = request.headers.token.userData.name;
     const checkFriendRequest = {
       friendId: request.recipientId,
       headers: request.headers,
@@ -65,24 +66,19 @@ export default class ConversationService {
     message.message = this.sanitise(request.message);
     message.createdAt = now;
     message.conversation = conversation;
-    await this.repository.updateOne(
-      {
-        id: conversation.id,
+    await this.repository.updateOne(conversation.id, {
+      $push: {
+        messages: message,
       },
-      {
-        $push: {
-          messages: message,
-        },
-      }
-    );
+    });
     utils.sendMessagePushNotification(
       `${msgId}`,
       request.recipientId,
-      `${request.headers.token.userData.id}`,
-      request.message,
+      `${this.sanitise(request.message)} `,
       'push_up',
+      FirebaseType.TOKEN,
       false,
-      FirebaseType.TOKEN
+      `${name} was sent you a message`
     );
     this.publish(
       'message',
