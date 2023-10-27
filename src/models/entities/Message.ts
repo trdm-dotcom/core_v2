@@ -1,5 +1,5 @@
-import { Column, Entity, ManyToOne, ObjectID, ObjectIdColumn, Tree, TreeChildren, TreeParent } from 'typeorm';
-import Conversation from './Conversation';
+import { Column, Entity, ObjectIdColumn, Tree, TreeChildren, TreeParent } from 'typeorm';
+import { ObjectID } from 'mongodb';
 
 @Entity()
 @Tree('nested-set')
@@ -12,8 +12,6 @@ export class Message {
   children: Message[];
   @TreeParent()
   parent: Message;
-  @ManyToOne(() => Conversation, (conversation) => conversation.messages)
-  conversation: Conversation;
   @Column()
   userId: number;
   @Column()

@@ -102,7 +102,12 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.updateOne(post.id, { disable: true });
+      await this.postRepository.updateOne(
+        {
+          _id: new ObjectID(request.post),
+        },
+        { disable: true }
+      );
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
@@ -195,8 +200,8 @@ export default class PostService {
           tags: tags,
           caption: post.caption,
           createdAt: post.createdAt,
-          reactions: post.reactions ? post.reactions : [],
-          comments: post.comments ? post.comments : [],
+          reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
+          comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
         };
       });
     } catch (err) {
@@ -218,7 +223,7 @@ export default class PostService {
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
-        disable: true,
+        disable: false,
       },
     });
     if (post == null) {
@@ -228,24 +233,27 @@ export default class PostService {
     if (request.commentId != null) {
       comment = post.comments.find((comment) => comment.id === new ObjectID(request.commentId));
       const replyComment: Comment = new Comment();
-      replyComment.id = new ObjectID();
       replyComment.userId = request.headers.token.userData.id;
       replyComment.comment = this.sanitise(request.comment);
       replyComment.parent = comment;
-      replyComment.post = post;
+      replyComment.createdAt = new Date();
       comment.children.push(replyComment);
     } else {
       comment = new Comment();
-      comment.id = new ObjectID();
       comment.userId = request.headers.token.userData.id;
-      comment.post = post;
       comment.comment = this.sanitise(request.comment);
+      comment.createdAt = new Date();
     }
-    this.postRepository.updateOne(post.id, {
-      $push: {
-        comments: comment,
+    this.postRepository.updateOne(
+      {
+        _id: new ObjectID(request.postId),
       },
-    });
+      {
+        $push: {
+          comments: comment,
+        },
+      }
+    );
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
@@ -275,7 +283,7 @@ export default class PostService {
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
-        disable: true,
+        disable: false,
       },
     });
     if (post == null) {
@@ -284,12 +292,16 @@ export default class PostService {
     const reaction: Reaction = new Reaction();
     reaction.userId = request.headers.token.userData.id;
     reaction.reaction = request.reaction;
-    reaction.post = post;
-    this.postRepository.updateOne(post.id, {
-      $push: {
-        reactions: reaction,
+    this.postRepository.updateOne(
+      {
+        _id: new ObjectID(request.postId),
       },
-    });
+      {
+        $push: {
+          reactions: reaction,
+        },
+      }
+    );
     utils.sendMessagePushNotification(
       `${transactionId}`,
       post.userId,
@@ -310,30 +322,24 @@ export default class PostService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
         disable: false,
       },
-      select: ['comments'],
     });
-    if (post == null) {
+    if (post == null || post.comments == null) {
       return [];
     }
-    if (post.comments.length <= offset) {
-      return [];
-    }
-    const comments: Comment[] = post.comments.slice(offset, offset + limit);
+    const comments: Comment[] = post.comments;
     const users: Set<number> = new Set();
     comments.forEach((comment: Comment) => {
       users.add(comment.userId);
-      comment.children.forEach((reply) => users.add(reply.userId));
+      comment.children?.forEach((reply) => users.add(reply.userId));
     });
     try {
       const userInfosRequest = {
-        userIds: users,
+        userIds: Array.from(users.values()),
         headers: request.headers,
       };
       const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
@@ -353,7 +359,7 @@ export default class PostService {
         avatar: mapUserInfos.get(comment.userId).avatar,
         name: mapUserInfos.get(comment.userId).name,
         comment: comment.comment,
-        commentReplies: comment.children.map((reply) => ({
+        commentReplies: comment.children?.map((reply) => ({
           userId: reply.userId,
           avatar: mapUserInfos.get(reply.userId).avatar,
           name: mapUserInfos.get(reply.userId).name,
@@ -371,7 +377,7 @@ export default class PostService {
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
-        disable: true,
+        disable: false,
       },
     });
     if (post == null) {
@@ -384,7 +390,12 @@ export default class PostService {
     if (comment.userId != request.headers.token.userData.id) {
       throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
     }
-    await this.postRepository.updateOne(post.id, { $pull: { comments: { id: new ObjectID(request.commentId) } } });
+    await this.postRepository.updateOne(
+      {
+        _id: new ObjectID(request.postId),
+      },
+      { $pull: { comments: { id: new ObjectID(request.commentId) } } }
+    );
     return {};
   }
 
@@ -392,29 +403,23 @@ export default class PostService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
         disable: false,
       },
-      select: ['comments'],
     });
-    if (post == null) {
+    if (post == null || post.reactions == null) {
       return [];
     }
-    if (post.reactions.length <= offset) {
-      return [];
-    }
-    const reactions: Reaction[] = post.reactions.slice(offset, offset + limit);
+    const reactions: Reaction[] = post.reactions;
     const users: Set<number> = new Set();
     reactions.forEach((reaction: Reaction) => {
       users.add(reaction.userId);
     });
     try {
       const userInfosRequest = {
-        userIds: users,
+        userIds: Array.from(users.values()),
         headers: request.headers,
       };
       const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
@@ -429,7 +434,6 @@ export default class PostService {
         mapUserInfos.set(info.id, info);
       });
       return reactions.map((reaction: Reaction) => ({
-        postId: request.postId,
         userId: reaction.userId,
         avatar: mapUserInfos.get(reaction.userId).avatar,
         name: mapUserInfos.get(reaction.userId).name,

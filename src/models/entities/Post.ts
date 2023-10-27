@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, OneToMany, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
 import Reaction from './Reaction';
 import Comment from './Comment';
 
@@ -14,9 +14,9 @@ export default class Post {
   source: string;
   @Column()
   disable: boolean;
-  @OneToMany(() => Comment, (comment) => comment.post)
+  @Column((type) => Comment, { array: true })
   comments: Comment[];
-  @OneToMany(() => Reaction, (reaction) => reaction.post)
+  @Column((type) => Reaction, { array: true })
   reactions: Reaction[];
   @Column((type) => Number, { array: true })
   tags: number[];

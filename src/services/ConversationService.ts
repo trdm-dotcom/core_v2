@@ -5,13 +5,14 @@ import { getInstance } from './KafkaProducerService';
 import { IMessage } from 'kafka-common/build/src/modules/kafka';
 import { Kafka } from 'kafka-common';
 import Constants from '../Constants';
-import { MongoRepository, ObjectID } from 'typeorm';
+import { MongoRepository } from 'typeorm';
 import Conversation from '../models/entities/Conversation';
 import { Message } from '../models/entities/Message';
 import RedisService from './RedisService';
 import { InjectRepository } from 'typeorm-typedi-extensions';
 import { FirebaseType, IDataRequest } from 'common/build/src/modules/models';
 import * as utils from '../utils/Utils';
+import { ObjectID } from 'mongodb';
 
 @Service()
 export default class ConversationService {
@@ -29,7 +30,7 @@ export default class ConversationService {
     const userId: number = request.headers.token.userData.id;
     const name: string = request.headers.token.userData.name;
     const checkFriendRequest = {
-      friendId: request.recipientId,
+      friend: request.recipientId,
       headers: request.headers,
     };
     let data: any = {};
@@ -62,15 +63,20 @@ export default class ConversationService {
     }
     const now: Date = new Date();
     const message: Message = new Message();
+    message.id = new ObjectID();
     message.userId = userId;
     message.message = this.sanitise(request.message);
     message.createdAt = now;
-    message.conversation = conversation;
-    await this.repository.updateOne(conversation.id, {
-      $push: {
-        messages: message,
+    await this.repository.updateOne(
+      {
+        _id: conversation.id,
       },
-    });
+      {
+        $push: {
+          messages: message,
+        },
+      }
+    );
     utils.sendMessagePushNotification(
       `${msgId}`,
       request.recipientId,
@@ -124,7 +130,7 @@ export default class ConversationService {
         });
       } catch (err) {
         Logger.error(`${msgId} fail to send message`, err);
-        throw new Errors.GeneralError();
+        return [];
       }
     }
     const conversations: Conversation[] = await this.repository.find({
@@ -145,7 +151,7 @@ export default class ConversationService {
       conversation.users.forEach((user) => users.add(user));
     });
     const userInfosRequest = {
-      userIds: users,
+      userIds: Array.from(users),
       headers: request.headers,
     };
     try {
@@ -187,7 +193,7 @@ export default class ConversationService {
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.chatId),
+        _id: new ObjectID(request.chatId),
         users: {
           $all: [userId],
         },
@@ -196,7 +202,7 @@ export default class ConversationService {
     if (conversation == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    await this.repository.deleteOne({ id: conversation.id });
+    await this.repository.delete(conversation.id);
     this.publish('delete.room', { id: conversation.id }, sourceId);
     return {};
   }
@@ -210,20 +216,20 @@ export default class ConversationService {
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
-        id: ObjectID.createFromHexString(request.chatId),
+        _id: new ObjectID(request.chatId),
         users: {
           $all: [userId],
         },
       },
     });
     if (conversation == null) {
-      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+      return [];
     }
     const users: Set<number> = new Set<number>();
     conversation.users.forEach((user) => users.add(user));
     try {
       const userInfosRequest = {
-        userIds: users,
+        userIds: Array.from(users),
         headers: request.headers,
       };
       const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
@@ -239,11 +245,13 @@ export default class ConversationService {
       });
       const messages = conversation.messages.slice(offset, offset + limit);
       return messages.map((message: Message) => ({
-        id: message.id,
-        userId: message.userId,
-        avatar: mapUserInfos.get(message.userId).avatar,
-        name: mapUserInfos.get(message.userId).name,
-        message: message.message,
+        _id: message.id,
+        user: {
+          userId: message.userId,
+          avatar: mapUserInfos.get(message.userId).avatar,
+          name: mapUserInfos.get(message.userId).name,
+        },
+        text: message.message,
         createdAt: message.createdAt,
       }));
     } catch (err) {
