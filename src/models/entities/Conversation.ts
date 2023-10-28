@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
-import { Message } from './Message';
+
 import { ObjectID } from 'mongodb';
+import { Message } from './Message';
 
 @Entity()
 export default class Conversation {

@@ -5,7 +5,7 @@ import { ObjectID } from 'mongodb';
 @Tree('nested-set')
 export class Message {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
   @Column()
   message: string;
   @TreeChildren()

@@ -4,7 +4,7 @@ import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, Tree, TreeC
 @Tree('nested-set')
 export default class Comment {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
   @Column()
   userId: number;
   @Column()

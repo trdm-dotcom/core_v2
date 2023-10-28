@@ -231,8 +231,9 @@ export default class PostService {
     }
     let comment: Comment;
     if (request.commentId != null) {
-      comment = post.comments.find((comment) => comment.id === new ObjectID(request.commentId));
+      comment = post.comments.find((comment) => comment._id === new ObjectID(request.commentId));
       const replyComment: Comment = new Comment();
+      replyComment._id = new ObjectID();
       replyComment.userId = request.headers.token.userData.id;
       replyComment.comment = this.sanitise(request.comment);
       replyComment.parent = comment;
@@ -240,6 +241,7 @@ export default class PostService {
       comment.children.push(replyComment);
     } else {
       comment = new Comment();
+      comment._id = new ObjectID();
       comment.userId = request.headers.token.userData.id;
       comment.comment = this.sanitise(request.comment);
       comment.createdAt = new Date();
@@ -290,6 +292,7 @@ export default class PostService {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
     const reaction: Reaction = new Reaction();
+    reaction._id = new ObjectID();
     reaction.userId = request.headers.token.userData.id;
     reaction.reaction = request.reaction;
     this.postRepository.updateOne(
@@ -354,6 +357,7 @@ export default class PostService {
         mapUserInfos.set(info.id, info);
       });
       return comments.map((comment: Comment) => ({
+        id: comment._id.toHexString(),
         postId: request.postId,
         userId: comment.userId,
         avatar: mapUserInfos.get(comment.userId).avatar,
@@ -383,7 +387,7 @@ export default class PostService {
     if (post == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    const comment: Comment = post.comments.find((comment) => comment.id === new ObjectID(request.commentId));
+    const comment: Comment = post.comments.find((comment) => comment._id === new ObjectID(request.commentId));
     if (comment == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
@@ -434,6 +438,7 @@ export default class PostService {
         mapUserInfos.set(info.id, info);
       });
       return reactions.map((reaction: Reaction) => ({
+        id: reaction._id.toHexString(),
         userId: reaction.userId,
         avatar: mapUserInfos.get(reaction.userId).avatar,
         name: mapUserInfos.get(reaction.userId).name,

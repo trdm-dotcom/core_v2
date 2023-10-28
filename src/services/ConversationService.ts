@@ -63,7 +63,7 @@ export default class ConversationService {
     }
     const now: Date = new Date();
     const message: Message = new Message();
-    message.id = new ObjectID();
+    message._id = new ObjectID(request.messagesId);
     message.userId = userId;
     message.message = this.sanitise(request.message);
     message.createdAt = now;
@@ -211,8 +211,6 @@ export default class ConversationService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.chatId, 'chatId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
@@ -243,13 +241,12 @@ export default class ConversationService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      const messages = conversation.messages.slice(offset, offset + limit);
-      return messages.map((message: Message) => ({
-        _id: message.id,
+      return conversation.messages.map((message: Message, index: number) => ({
+        _id: message._id.toHexString(),
         user: {
-          userId: message.userId,
-          avatar: mapUserInfos.get(message.userId).avatar,
+          _id: message.userId,
           name: mapUserInfos.get(message.userId).name,
+          avatar: mapUserInfos.get(message.userId).avatar,
         },
         text: message.message,
         createdAt: message.createdAt,
