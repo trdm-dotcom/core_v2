@@ -59,6 +59,9 @@ export default class RequestHandler {
         case 'get:/api/v1/social/post/reactions':
           return this.postService.getReactionsOfPost(message.data, message.transactionId);
 
+        case 'get:/api/v1/social/post/user':
+          return this.postService.getPostOfUser(message.data, message.transactionId);
+
         case 'post:/api/v1/chat/message':
           return this.conversationService.sendMessage(message.data, message.sourceId, message.transactionId);
 
@@ -73,6 +76,9 @@ export default class RequestHandler {
 
         case 'internal:/api/v1/conversation/deleteAll':
           return this.conversationService.deleteAll(message.data, message.transactionId);
+
+        case 'get:/api/v1/conversation/between':
+          return this.conversationService.getConversationBetween(message.data, message.transactionId);
 
         default:
           throw new UriNotFound();

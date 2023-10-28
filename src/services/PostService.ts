@@ -268,7 +268,46 @@ export default class PostService {
       post.id.toHexString(),
       userId
     );
-    this.publish('comment', { postId: request.postId, comment: request.comment }, sourceId);
+    const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
+      `${transactionId}`,
+      'user',
+      'internal:/api/v1/userInfos',
+      {
+        userIds: [request.headers.token.userData.id],
+        headers: request.headers,
+      }
+    );
+    const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
+    const mapUserInfos: Map<number, any> = new Map();
+    userInfosData.forEach((info: any) => {
+      mapUserInfos.set(info.id, info);
+    });
+    this.publish(
+      'comment',
+      {
+        to: post.id.toHexString(),
+        data: {
+          id: comment._id.toHexString(),
+          postId: request.postId,
+          userId: comment.userId,
+          avatar: mapUserInfos.get(comment.userId).avatar,
+          name: mapUserInfos.get(comment.userId).name,
+          comment: comment.comment,
+          createdAt: comment.createdAt,
+        },
+      },
+      sourceId
+    );
+    this.publish(
+      'post.comment',
+      {
+        to: post.id.toHexString(),
+        data: {
+          comments: [comment.userId],
+        },
+      },
+      sourceId
+    );
     return {};
   }
 
@@ -317,7 +356,7 @@ export default class PostService {
       post.id.toHexString(),
       userId
     );
-    this.publish('reaction', { postId: request.postId, reaction: request.reaction }, sourceId);
+    this.publish('post.reaction', { postId: post.id.toHexString(), data: { reactions: [userId] } }, sourceId);
     return {};
   }
 
@@ -368,6 +407,7 @@ export default class PostService {
           avatar: mapUserInfos.get(reply.userId).avatar,
           name: mapUserInfos.get(reply.userId).name,
           comment: reply.comment,
+          createdAt: reply.createdAt,
         })),
         createdAt: comment.createdAt,
       }));
@@ -451,6 +491,31 @@ export default class PostService {
     }
   }
 
+  public async getPostOfUser(request: IPostRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.targetId, 'targetId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const posts: Post[] = await this.postRepository.find({
+      where: {
+        userId: request.targetId,
+        disable: false,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+      skip: offset,
+      take: limit,
+    });
+    return posts.map((post: Post) => {
+      return {
+        id: post.id,
+        source: post.source,
+      };
+    });
+  }
+
   private sanitise(text: string) {
     let sanitisedText = text;
 
@@ -467,6 +532,6 @@ export default class PostService {
       type: type,
       data: data,
     };
-    this.redisService.publish('core', outgoing);
+    this.redisService.publish('gateway', outgoing);
   }
 }
