@@ -149,7 +149,7 @@ export default class PostService {
 
   public async get(request: IPostRequest, transactionId: string | number) {
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
     const userId = request.headers.token.userData.id;
     try {
       const getFriendRequest = {
@@ -438,7 +438,7 @@ export default class PostService {
       {
         _id: new ObjectID(request.postId),
       },
-      { $pull: { comments: { id: new ObjectID(request.commentId) } } }
+      { $pull: { comments: { _id: new ObjectID(request.commentId) } } }
     );
     return {};
   }
@@ -496,7 +496,7 @@ export default class PostService {
     Utils.validate(request.targetId, 'targetId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
     const posts: Post[] = await this.postRepository.find({
       where: {
         userId: request.targetId,

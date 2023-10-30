@@ -137,7 +137,7 @@ export default class ConversationService {
   public async getConversations(request: IChatRequest, transactionId: string | number) {
     const userId: number = request.headers.token.userData.id;
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber - 1, 0) * limit;
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
     const userIds: number[] = [userId];
     if (request.search != null) {
       const requestSearchUser = {
