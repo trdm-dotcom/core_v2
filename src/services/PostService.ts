@@ -418,6 +418,10 @@ export default class PostService {
   }
 
   public async deleteComment(request: ICommentRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.commentId, 'commentId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.postId),
@@ -427,7 +431,7 @@ export default class PostService {
     if (post == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    const comment: Comment = post.comments.find((comment) => comment._id === new ObjectID(request.commentId));
+    const comment: Comment = post.comments.find((comment) => comment._id == request.commentId);
     if (comment == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }

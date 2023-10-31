@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectIdColumn } from 'typeorm';
+import { ObjectID } from 'mongodb';
 
 @Entity()
 export default class Reaction {

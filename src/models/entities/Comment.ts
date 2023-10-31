@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, Tree, TreeChildren, TreeParent } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ObjectIdColumn, Tree, TreeChildren, TreeParent } from 'typeorm';
+import { ObjectID } from 'mongodb';
 
 @Entity()
 @Tree('nested-set')
