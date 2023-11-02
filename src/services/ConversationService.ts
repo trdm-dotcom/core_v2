@@ -38,7 +38,7 @@ export default class ConversationService {
       const checkFriendResponse: IMessage = await getInstance().sendRequestAsync(
         `${transactionId}`,
         'user',
-        'post:/api/v1/user/checkFriend',
+        'get:/api/v1/user/checkFriend',
         checkFriendRequest
       );
       data = Kafka.getResponse(checkFriendResponse);
@@ -63,7 +63,7 @@ export default class ConversationService {
     }
     const now: Date = new Date();
     const message: Message = new Message();
-    message._id = new ObjectID(request.messagesId);
+    message._id = new ObjectID();
     message.userId = userId;
     message.message = this.sanitise(request.message);
     message.createdAt = now;
@@ -135,10 +135,13 @@ export default class ConversationService {
   }
 
   public async getConversations(request: IChatRequest, transactionId: string | number) {
-    const userId: number = request.headers.token.userData.id;
+    // const userId: number = request.headers.token.userData.id;
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
-    const userIds: number[] = [userId];
+    const userIds: Set<number> = new Set<number>();
+    let filter: any = {
+      $all: [request.headers.token.userData.id],
+    };
     if (request.search != null) {
       const requestSearchUser = {
         search: request.search,
@@ -153,8 +156,12 @@ export default class ConversationService {
         );
         const data = Kafka.getResponse<any[]>(searchUserResponse);
         data.forEach((user: any) => {
-          userIds.push(user.id);
+          userIds.add(user.id);
         });
+        filter = {
+          ...filter,
+          $in: Array.from(userIds),
+        };
       } catch (err) {
         Logger.error(`${transactionId} fail to send message`, err);
         return [];
@@ -162,9 +169,7 @@ export default class ConversationService {
     }
     const conversations: Conversation[] = await this.repository.find({
       where: {
-        users: {
-          $in: userIds,
-        },
+        users: filter,
       },
       order: { ['updatedAt']: 'DESC' },
       skip: offset,
@@ -318,11 +323,11 @@ export default class ConversationService {
     Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
-    const userIds: number[] = [userId, request.recipientId];
+    const userIds: number[] = [userId, Number(request.recipientId)];
     const conversations: Conversation = await this.repository.findOne({
       where: {
         users: {
-          $in: userIds,
+          $all: userIds,
         },
       },
     });

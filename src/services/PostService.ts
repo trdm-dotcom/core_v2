@@ -158,15 +158,15 @@ export default class PostService {
       const getFriendResponse: IMessage = await getInstance().sendRequestAsync(
         `${transactionId}`,
         'user',
-        'internal:/api/v1/user/friends',
+        'get:/api/v1/user/friend',
         getFriendRequest
       );
       const friendsData = Kafka.getResponse<any[]>(getFriendResponse);
       const setUserIds: Set<number> = new Set([userId]);
       const mapUsers: Map<number, any> = new Map([[userId, request.headers.token.userData]]);
       friendsData.forEach((friend) => {
-        mapUsers.set(friend.id, friend);
-        setUserIds.add(friend.id);
+        mapUsers.set(friend.friendId, friend);
+        setUserIds.add(friend.friendId);
       });
       const posts: Post[] = await this.postRepository.find({
         where: {
@@ -356,7 +356,7 @@ export default class PostService {
       post.id.toHexString(),
       userId
     );
-    this.publish('post.reaction', { postId: post.id.toHexString(), data: { reactions: [userId] } }, sourceId);
+    this.publish('post.reaction', { to: post.id.toHexString(), data: { reactions: [userId] } }, sourceId);
     return {};
   }
 
@@ -503,7 +503,7 @@ export default class PostService {
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
     const posts: Post[] = await this.postRepository.find({
       where: {
-        userId: request.targetId,
+        userId: Number(request.targetId),
         disable: false,
       },
       order: {

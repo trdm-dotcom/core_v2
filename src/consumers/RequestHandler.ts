@@ -77,7 +77,7 @@ export default class RequestHandler {
         case 'internal:/api/v1/conversation/deleteAll':
           return this.conversationService.deleteAll(message.data, message.transactionId);
 
-        case 'get:/api/v1/conversation/between':
+        case 'get:/api/v1/chat/conversation/between':
           return this.conversationService.getConversationBetween(message.data, message.transactionId);
 
         default:
