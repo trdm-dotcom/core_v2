@@ -163,9 +163,7 @@ export default class PostService {
       );
       const friendsData = Kafka.getResponse<any[]>(getFriendResponse);
       const setUserIds: Set<number> = new Set([userId]);
-      const mapUsers: Map<number, any> = new Map([[userId, request.headers.token.userData]]);
       friendsData.forEach((friend) => {
-        mapUsers.set(friend.friendId, friend);
         setUserIds.add(friend.friendId);
       });
       const posts: Post[] = await this.postRepository.find({
@@ -178,6 +176,28 @@ export default class PostService {
         },
         skip: offset,
         take: limit,
+      });
+
+      posts.forEach((post) => {
+        if (post.tags != null) {
+          post.tags.forEach((element) => {
+            setUserIds.add(element);
+          });
+        }
+      });
+      const getUserInfosRequest = {
+        userIds: Array.from(setUserIds.values()),
+      };
+      const getUserInfosResponse: IMessage = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'user',
+        'internal:/api/v1/userInfos',
+        getUserInfosRequest
+      );
+      const userInfos = Kafka.getResponse<any[]>(getUserInfosResponse);
+      const mapUsers: Map<number, any> = new Map();
+      userInfos.forEach((user) => {
+        mapUsers.set(user.id, user);
       });
       return posts.map((post: Post) => {
         const author = mapUsers.get(post.userId);
@@ -207,6 +227,87 @@ export default class PostService {
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
+    }
+  }
+
+  async getPostByTag(request: IPostRequest, transactionId: string | number) {
+    const userId = request.targetId != null ? request.targetId : request.headers.token.userData.id;
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const posts: Post[] = await this.postRepository.find({
+      where: {
+        tags: { $in: [Number(userId)] },
+        disable: false,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+      skip: offset,
+      take: limit,
+    });
+    return posts.map((post: Post) => {
+      return {
+        id: post.id,
+        source: post.source,
+      };
+    });
+  }
+
+  async getDetail(request: IPostRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.post, 'post').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const post: Post = await this.postRepository.findOne({
+      where: {
+        _id: new ObjectID(request.post),
+        disable: false,
+      },
+    });
+    if (post == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
+    try {
+      const userIds: Set<number> = new Set([post.userId]);
+      if (post.tags != null) {
+        post.tags.forEach((element) => {
+          userIds.add(element);
+        });
+      }
+      const getUserInfosRequest = {
+        userIds: Array.from(userIds.values()),
+      };
+      const getUserInfosResponse: IMessage = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'user',
+        'internal:/api/v1/userInfos',
+        getUserInfosRequest
+      );
+      const userInfos = Kafka.getResponse<any[]>(getUserInfosResponse);
+      const mapUsers: Map<number, any> = new Map();
+      userInfos.forEach((user) => {
+        mapUsers.set(user.id, user);
+      });
+      const author = mapUsers.get(post.userId);
+      const tags = post.tags
+        ? post.tags.map((tag) => ({
+            id: tag,
+            name: mapUsers.get(tag).name,
+            avatar: mapUsers.get(tag).avatar,
+          }))
+        : [];
+      return {
+        id: post.id,
+        source: post.source,
+        author: author,
+        tags: tags,
+        caption: post.caption,
+        createdAt: post.createdAt,
+        reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
+        comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
+      };
+    } catch (err) {
+      console.log(err);
+      return {};
     }
   }
 

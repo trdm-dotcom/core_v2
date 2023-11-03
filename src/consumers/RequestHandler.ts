@@ -41,6 +41,12 @@ export default class RequestHandler {
         case 'get:/api/v1/social/post':
           return this.postService.get(message.data, message.transactionId);
 
+        case 'get:/api/v1/social/post/tag':
+          return this.postService.getPostByTag(message.data, message.transactionId);
+
+        case 'get:/api/v1/social/post/detail':
+          return this.postService.getDetail(message.data, message.transactionId);
+
         case 'put:/api/v1/social/post/disable':
           return this.postService.disable(message.data, message.transactionId);
 
