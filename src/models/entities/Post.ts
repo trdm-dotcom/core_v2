@@ -18,7 +18,7 @@ export default class Post {
   comments: Comment[];
   @Column((type) => Reaction, { array: true })
   reactions: Reaction[];
-  @Column((type) => Number, { array: true })
+  @Column({ array: true })
   tags: number[];
   @CreateDateColumn()
   createdAt: Date;

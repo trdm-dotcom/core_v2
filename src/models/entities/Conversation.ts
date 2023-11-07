@@ -7,8 +7,6 @@ import { Message } from './Message';
 export default class Conversation {
   @ObjectIdColumn()
   id: ObjectID;
-  @Column()
-  group: boolean;
   @Column({ array: true })
   users: number[];
   @Column((type) => Message, { array: true })
@@ -19,4 +17,6 @@ export default class Conversation {
   createdAt: Date;
   @UpdateDateColumn()
   updatedAt: Date;
+  @Column('json')
+  deletedAt: { [userId: number]: Date };
 }

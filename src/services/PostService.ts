@@ -204,8 +204,8 @@ export default class PostService {
         const tags = post.tags
           ? post.tags.map((tag) => ({
               id: tag,
-              name: mapUsers.get(tag).name,
-              avatar: mapUsers.get(tag).avatar,
+              name: mapUsers.get(tag) == null ? null : mapUsers.get(tag).name,
+              avatar: mapUsers.get(tag) == null ? null : mapUsers.get(tag).avatar,
             }))
           : [];
 
@@ -291,8 +291,8 @@ export default class PostService {
       const tags = post.tags
         ? post.tags.map((tag) => ({
             id: tag,
-            name: mapUsers.get(tag).name,
-            avatar: mapUsers.get(tag).avatar,
+            name: mapUsers.get(tag) == null ? null : mapUsers.get(tag).name,
+            avatar: mapUsers.get(tag) == null ? null : mapUsers.get(tag).avatar,
           }))
         : [];
       return {

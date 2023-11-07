@@ -234,12 +234,40 @@ export default class ConversationService {
     if (conversation == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    await this.repository.delete(conversation.id);
+    await this.repository.updateOne(
+      {
+        _id: conversation.id,
+      },
+      {
+        $set: {
+          [`deletedAt.${userId}`]: new Date(),
+        },
+      }
+    );
     this.publish(
       'delete.room',
-      { to: conversation.users.find((user) => user != userId), data: { id: conversation.id } },
+      { to: userId, data: { id: conversation.id } },
       sourceId
     );
+    return {};
+  }
+
+  public async internalDeleteRoom(request: IChatRequest, transactionId: string | number, sourceId: string) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const userId: number = request.headers.token.userData.id;
+    const conversation: Conversation = await this.repository.findOne({
+      where: {
+        users: {
+          $all: [userId, request.recipientId],
+        },
+      },
+    });
+    if (conversation == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
+    await this.repository.delete(conversation.id);
     return {};
   }
 

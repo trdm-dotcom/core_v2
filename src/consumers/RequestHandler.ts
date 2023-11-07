@@ -77,6 +77,9 @@ export default class RequestHandler {
         case 'delete:/api/v1/chat/conversation':
           return this.conversationService.deleteRoom(message.data, message.transactionId, message.sourceId);
 
+        case 'internal:/api/v1/chat/conversation/delete':
+          return this.conversationService.internalDeleteRoom(message.data, message.transactionId, message.sourceId);
+
         case 'get:/api/v1/chat/conversation/messages':
           return this.conversationService.getMessagesByRoomId(message.data, message.transactionId);
 
