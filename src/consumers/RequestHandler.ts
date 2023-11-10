@@ -60,7 +60,7 @@ export default class RequestHandler {
           return this.postService.getCommentsOfPost(message.data, message.transactionId);
 
         case 'delete:/api/v1/social/post/comments':
-          return this.postService.deleteComment(message.data, message.transactionId);
+          return this.postService.deleteComment(message.data, message.transactionId, message.sourceId);
 
         case 'post:/api/v1/social/reaction':
           return this.postService.reaction(message.data, message.transactionId, message.sourceId);

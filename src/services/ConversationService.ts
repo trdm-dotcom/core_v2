@@ -190,6 +190,7 @@ export default class ConversationService {
       return {
         total: total,
         datas: [],
+        page: 0,
         totalPages: 0,
       };
     }
@@ -234,6 +235,7 @@ export default class ConversationService {
       return {
         total: total,
         datas: datas,
+        page: request.pageNumber,
         totalPages: Math.ceil(total / limit),
       };
     } catch (err) {
@@ -241,6 +243,7 @@ export default class ConversationService {
       return {
         total: 0,
         datas: [],
+        page: 0,
         totalPages: 0,
       };
     }

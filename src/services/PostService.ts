@@ -174,13 +174,15 @@ export default class PostService {
       const getFriendResponse: IMessage = await getInstance().sendRequestAsync(
         `${transactionId}`,
         'user',
-        'get:/api/v1/user/friend',
+        'internal:/api/v1/user/friend',
         getFriendRequest
       );
       const friendsData = Kafka.getResponse<any[]>(getFriendResponse);
       const setUserIds: Set<number> = new Set([userId]);
+      const mapUsers: Map<number, any> = new Map();
       friendsData.forEach((friend) => {
-        setUserIds.add(friend.friendId);
+        setUserIds.add(friend.id);
+        mapUsers.set(friend.id, friend);
       });
       const posts: Post[] = await this.postRepository.find({
         where: {
@@ -205,20 +207,6 @@ export default class PostService {
             setUserIds.add(element);
           });
         }
-      });
-      const getUserInfosRequest = {
-        userIds: Array.from(setUserIds.values()),
-      };
-      const getUserInfosResponse: IMessage = await getInstance().sendRequestAsync(
-        `${transactionId}`,
-        'user',
-        'internal:/api/v1/userInfos',
-        getUserInfosRequest
-      );
-      const userInfos = Kafka.getResponse<any[]>(getUserInfosResponse);
-      const mapUsers: Map<number, any> = new Map();
-      userInfos.forEach((user) => {
-        mapUsers.set(user.id, user);
       });
       const datas: any[] = [];
       posts.forEach((post: Post) => {
@@ -256,6 +244,7 @@ export default class PostService {
       return {
         total: total,
         datas: datas,
+        page: request.pageNumber,
         totalPages: Math.ceil(total / limit),
       };
     } catch (err) {
@@ -263,6 +252,7 @@ export default class PostService {
       return {
         total: 0,
         datas: [],
+        page: 0,
         totalPages: 0,
       };
     }
@@ -298,6 +288,7 @@ export default class PostService {
     return {
       total: total,
       datas: post,
+      page: request.pageNumber,
       totalPages: Math.ceil(total / limit),
     };
   }
@@ -332,6 +323,7 @@ export default class PostService {
     return {
       total: total,
       datas: post,
+      page: request.pageNumber,
       totalPages: Math.ceil(total / limit),
     };
   }
@@ -368,6 +360,7 @@ export default class PostService {
     return {
       total: total,
       datas: post,
+      page: request.pageNumber,
       totalPages: Math.ceil(total / limit),
     };
   }
@@ -659,7 +652,7 @@ export default class PostService {
     }
   }
 
-  public async deleteComment(request: ICommentRequest, transactionId: string | number) {
+  public async deleteComment(request: ICommentRequest, transactionId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.postId, 'postId').setRequire().throwValid(invalidParams);
     Utils.validate(request.commentId, 'commentId').setRequire().throwValid(invalidParams);
@@ -685,6 +678,14 @@ export default class PostService {
         _id: new ObjectID(request.postId),
       },
       { $pull: { comments: { _id: new ObjectID(request.commentId) } } }
+    );
+    this.publish(
+      'delete.comment',
+      {
+        to: post.id.toHexString(),
+        id: request.commentId,
+      },
+      sourceId
     );
     return {};
   }
