@@ -179,8 +179,19 @@ export default class ConversationService {
       skip: offset,
       take: limit,
     });
+    const total: number = await this.repository.count({
+      where: {
+        users: filter,
+        sourceUser: userId,
+        deletedAt: null,
+      },
+    });
     if (conversations.length <= 0) {
-      return [];
+      return {
+        total: total,
+        datas: [],
+        totalPages: 0,
+      };
     }
     const users: Set<number> = new Set<number>();
     conversations.forEach((conversation: Conversation) => {
@@ -202,7 +213,7 @@ export default class ConversationService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      const responses: any[] = [];
+      const datas: any[] = [];
       conversations.forEach((conversation: Conversation) => {
         const userInfos: any[] = [];
         const targetInfo: any = mapUserInfos.get(conversation.targetUser);
@@ -213,17 +224,25 @@ export default class ConversationService {
               userInfos.push(info);
             }
           });
-          responses.push({
+          datas.push({
             id: conversation.id,
             users: userInfos,
             lastMessage: conversation.messages[conversation.messages.length - 1],
           });
         }
       });
-      return responses;
+      return {
+        total: total,
+        datas: datas,
+        totalPages: Math.ceil(total / limit),
+      };
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      return [];
+      return {
+        total: 0,
+        datas: [],
+        totalPages: 0,
+      };
     }
   }
 

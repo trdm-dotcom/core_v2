@@ -193,7 +193,12 @@ export default class PostService {
         skip: offset,
         take: limit,
       });
-
+      const total: number = await this.postRepository.count({
+        where: {
+          userId: { $in: Array.from(setUserIds) },
+          disable: false,
+        },
+      });
       posts.forEach((post) => {
         if (post.tags != null) {
           post.tags.forEach((element) => {
@@ -215,7 +220,7 @@ export default class PostService {
       userInfos.forEach((user) => {
         mapUsers.set(user.id, user);
       });
-      const responses: any[] = [];
+      const datas: any[] = [];
       posts.forEach((post: Post) => {
         const author = mapUsers.get(post.userId);
         if (author && author.status == 'ACTIVE') {
@@ -232,8 +237,7 @@ export default class PostService {
               }
             });
           }
-
-          responses.push({
+          datas.push({
             id: post.id,
             source: post.source,
             author: {
@@ -249,10 +253,18 @@ export default class PostService {
           });
         }
       });
-      return responses;
+      return {
+        total: total,
+        datas: datas,
+        totalPages: Math.ceil(total / limit),
+      };
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      return [];
+      return {
+        total: 0,
+        datas: [],
+        totalPages: 0,
+      };
     }
   }
 
@@ -271,12 +283,93 @@ export default class PostService {
       skip: offset,
       take: limit,
     });
-    return posts.map((post: Post) => {
+    const total: number = await this.postRepository.count({
+      where: {
+        tags: { $in: [Number(userId)] },
+        disable: false,
+      },
+    });
+    const post = posts.map((post: Post) => {
       return {
         id: post.id,
         source: post.source,
       };
     });
+    return {
+      total: total,
+      datas: post,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getHidePost(request: IPostRequest, transactionId: string | number) {
+    const userId = request.headers.token.userData.id;
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const posts: Post[] = await this.postRepository.find({
+      where: {
+        userId: Number(userId),
+        disable: true,
+      },
+      order: {
+        updatedAt: 'DESC',
+      },
+      skip: offset,
+      take: limit,
+    });
+    const total: number = await this.postRepository.count({
+      where: {
+        userId: Number(userId),
+        disable: true,
+      },
+    });
+    const post = posts.map((post: Post) => {
+      return {
+        id: post.id,
+        source: post.source,
+      };
+    });
+    return {
+      total: total,
+      datas: post,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  public async getPostOfUser(request: IPostRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.targetId, 'targetId').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const posts: Post[] = await this.postRepository.find({
+      where: {
+        userId: Number(request.targetId),
+        disable: false,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+      skip: offset,
+      take: limit,
+    });
+    const total: number = await this.postRepository.count({
+      where: {
+        userId: Number(request.targetId),
+        disable: false,
+      },
+    });
+    const post = posts.map((post: Post) => {
+      return {
+        id: post.id,
+        source: post.source,
+      };
+    });
+    return {
+      total: total,
+      datas: post,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getDetail(request: IPostRequest, transactionId: string | number) {
@@ -649,31 +742,6 @@ export default class PostService {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
     }
-  }
-
-  public async getPostOfUser(request: IPostRequest, transactionId: string | number) {
-    const invalidParams = new Errors.InvalidParameterError();
-    Utils.validate(request.targetId, 'targetId').setRequire().throwValid(invalidParams);
-    invalidParams.throwErr();
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
-    const posts: Post[] = await this.postRepository.find({
-      where: {
-        userId: Number(request.targetId),
-        disable: false,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-      skip: offset,
-      take: limit,
-    });
-    return posts.map((post: Post) => {
-      return {
-        id: post.id,
-        source: post.source,
-      };
-    });
   }
 
   private sanitise(text: string) {
