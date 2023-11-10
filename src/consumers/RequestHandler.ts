@@ -83,7 +83,7 @@ export default class RequestHandler {
         case 'get:/api/v1/chat/conversation/messages':
           return this.conversationService.getMessagesByRoomId(message.data, message.transactionId);
 
-        case 'internal:/api/v1/conversation/deleteAll':
+        case 'internal:/api/v1/deleteAll':
           return this.conversationService.deleteAll(message.data, message.transactionId);
 
         case 'get:/api/v1/chat/conversation/between':

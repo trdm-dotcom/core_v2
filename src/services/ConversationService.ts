@@ -10,9 +10,10 @@ import Conversation from '../models/entities/Conversation';
 import { Message } from '../models/entities/Message';
 import RedisService from './RedisService';
 import { InjectRepository } from 'typeorm-typedi-extensions';
-import { FirebaseType, IDataRequest } from 'common/build/src/modules/models';
+import { FirebaseType } from 'common/build/src/modules/models';
 import * as utils from '../utils/Utils';
 import { ObjectID } from 'mongodb';
+import Post from '../models/entities/Post';
 
 @Service()
 export default class ConversationService {
@@ -21,6 +22,9 @@ export default class ConversationService {
 
   @InjectRepository(Conversation)
   private repository: MongoRepository<Conversation>;
+
+  @InjectRepository(Post)
+  private postRepository: MongoRepository<Post>;
 
   public async sendMessage(request: IChatRequest, sourceId: string, transactionId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
@@ -44,22 +48,29 @@ export default class ConversationService {
       data = Kafka.getResponse(checkFriendResponse);
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
-      throw new Errors.GeneralError();
+      throw new Errors.GeneralError(Constants.CANT_SEND_MESSAGE);
     }
     if (!data.isFriend) {
       throw new Errors.GeneralError(Constants.CANT_SEND_MESSAGE);
     }
-    let conversation: Conversation = await this.repository.findOne({
+    let conversations: Conversation[] = await this.repository.find({
       where: {
         users: {
           $all: [userId, request.recipientId],
         },
       },
     });
-    if (conversation == null) {
-      conversation = new Conversation();
-      conversation.users = [userId, request.recipientId];
-      conversation = await this.repository.save(conversation);
+    Logger.info(`${transactionId} conversations`, conversations);
+    if (conversations.length <= 0) {
+      const source: Conversation = new Conversation();
+      source.users = [userId, request.recipientId];
+      source.sourceUser = userId;
+      source.targetUser = request.recipientId;
+      const target: Conversation = new Conversation();
+      target.users = [userId, request.recipientId];
+      target.sourceUser = request.recipientId;
+      target.targetUser = userId;
+      await this.repository.save([source, target]);
     }
     const now: Date = new Date();
     const message: Message = new Message();
@@ -67,41 +78,23 @@ export default class ConversationService {
     message.userId = userId;
     message.message = this.sanitise(request.message);
     message.createdAt = now;
-    await this.repository.updateOne(
+    await this.repository.updateMany(
       {
-        _id: conversation.id,
+        users: {
+          $all: [userId, request.recipientId],
+        },
       },
       {
+        $set: {
+          deletedAt: null,
+        },
         $push: {
           messages: message,
         },
       }
     );
-    utils.sendMessagePushNotification(
-      `${transactionId}`,
-      request.recipientId,
-      `${this.sanitise(request.message)} `,
-      'push_up',
-      FirebaseType.TOKEN,
-      false,
-      `${name} was sent you a message`
-    );
-    const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
-      `${transactionId}`,
-      'user',
-      'internal:/api/v1/userInfos',
-      {
-        userIds: [request.headers.token.userData.id],
-        headers: request.headers,
-      }
-    );
-    const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
-    const mapUserInfos: Map<number, any> = new Map();
-    userInfosData.forEach((info: any) => {
-      mapUserInfos.set(info.id, info);
-    });
     this.publish(
-      'message',
+      'receive-message',
       {
         to: request.recipientId,
         data: {
@@ -121,7 +114,7 @@ export default class ConversationService {
       {
         to: request.recipientId,
         data: {
-          id: conversation.id,
+          id: userId,
           users: {
             _id: userId,
             name: name,
@@ -131,18 +124,27 @@ export default class ConversationService {
       },
       sourceId
     );
+    utils.sendMessagePushNotification(
+      `${transactionId}`,
+      request.recipientId,
+      `${this.sanitise(request.message)} `,
+      'push_up',
+      FirebaseType.TOKEN,
+      false,
+      `${name} was sent you a message`
+    );
     return {};
   }
 
   public async getConversations(request: IChatRequest, transactionId: string | number) {
-    // const userId: number = request.headers.token.userData.id;
     const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
     const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
-    const userIds: Set<number> = new Set<number>();
+    const userId = request.headers.token.userData.id;
     let filter: any = {
-      $all: [request.headers.token.userData.id],
+      $all: [userId],
     };
     if (request.search != null) {
+      const userIds: Set<number> = new Set<number>();
       const requestSearchUser = {
         search: request.search,
         headers: request.headers,
@@ -170,6 +172,8 @@ export default class ConversationService {
     const conversations: Conversation[] = await this.repository.find({
       where: {
         users: filter,
+        sourceUser: userId,
+        deletedAt: null,
       },
       order: { ['updatedAt']: 'DESC' },
       skip: offset,
@@ -180,7 +184,7 @@ export default class ConversationService {
     }
     const users: Set<number> = new Set<number>();
     conversations.forEach((conversation: Conversation) => {
-      conversation.users.forEach((user) => users.add(user));
+      users.add(conversation.targetUser);
     });
     const userInfosRequest = {
       userIds: Array.from(users),
@@ -198,20 +202,25 @@ export default class ConversationService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      return conversations.map((conversation: Conversation) => {
+      const responses: any[] = [];
+      conversations.forEach((conversation: Conversation) => {
         const userInfos: any[] = [];
-        conversation.users.forEach((userId) => {
-          const info: any = mapUserInfos.get(userId);
-          if (info != null) {
-            userInfos.push(info);
-          }
-        });
-        return {
-          id: conversation.id,
-          users: userInfos,
-          lastMessage: conversation.messages[conversation.messages.length - 1],
-        };
+        const targetInfo: any = mapUserInfos.get(conversation.targetUser);
+        if (targetInfo && targetInfo.status === 'ACTIVE') {
+          conversation.users.forEach((userId) => {
+            const info: any = mapUserInfos.get(userId);
+            if (info != null) {
+              userInfos.push(info);
+            }
+          });
+          responses.push({
+            id: conversation.id,
+            users: userInfos,
+            lastMessage: conversation.messages[conversation.messages.length - 1],
+          });
+        }
       });
+      return responses;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
@@ -220,15 +229,13 @@ export default class ConversationService {
 
   public async deleteRoom(request: IChatRequest, transactionId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
-    Utils.validate(request.chatId, 'chatId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
-        _id: new ObjectID(request.chatId),
-        users: {
-          $all: [userId],
-        },
+        sourceUser: userId,
+        targetUser: request.recipientId,
       },
     });
     if (conversation == null) {
@@ -240,14 +247,10 @@ export default class ConversationService {
       },
       {
         $set: {
-          [`deletedAt.${userId}`]: new Date(),
+          deletedAt: new Date(),
+          messages: [],
         },
       }
-    );
-    this.publish(
-      'delete.room',
-      { to: userId, data: { id: conversation.id } },
-      sourceId
     );
     return {};
   }
@@ -257,31 +260,27 @@ export default class ConversationService {
     Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
-    const conversation: Conversation = await this.repository.findOne({
-      where: {
-        users: {
-          $all: [userId, request.recipientId],
-        },
+    await this.repository.deleteMany({
+      users: {
+        $all: [userId, Number(request.recipientId)],
       },
     });
-    if (conversation == null) {
-      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
-    }
-    await this.repository.delete(conversation.id);
+    this.publish('delete.room', { to: request.recipientId, data: { id: userId } }, sourceId);
     return {};
   }
 
   public async getMessagesByRoomId(request: IChatRequest, transactionId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
-    Utils.validate(request.chatId, 'chatId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.recipientId, 'recipientId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     const userId: number = request.headers.token.userData.id;
     const conversation: Conversation = await this.repository.findOne({
       where: {
-        _id: new ObjectID(request.chatId),
         users: {
-          $all: [userId],
+          $all: [userId, Number(request.recipientId)],
         },
+        sourceUser: userId,
+        targetUser: Number(request.recipientId),
       },
     });
     if (conversation == null) {
@@ -305,25 +304,43 @@ export default class ConversationService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      return conversation.messages.map((message: Message, index: number) => ({
-        _id: message._id.toHexString(),
-        user: {
-          _id: message.userId,
-          name: mapUserInfos.get(message.userId).name,
-          avatar: mapUserInfos.get(message.userId).avatar,
-        },
-        text: message.message,
-        createdAt: message.createdAt,
-      }));
+      const responses: any[] = [];
+      conversation.messages.forEach((message: Message, index: number) => {
+        const userInfo = mapUserInfos.get(message.userId);
+        if (userInfo && userInfo.status === 'ACTIVE') {
+          responses.push({
+            _id: message._id.toHexString(),
+            user: {
+              _id: message.userId,
+              name: userInfo.name,
+            },
+            text: message.message,
+            createdAt: message.createdAt,
+          });
+        }
+      });
+      return responses;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
     }
   }
 
-  public async deleteAll(request: IDataRequest, transactionId: string | number) {
-    const userId: number = request.headers.token.userData.id;
-    await this.repository.deleteMany({ users: { $ind: [userId] } });
+  public async deleteAll(request: any, transactionId: string | number) {
+    const userIds = request.userIds;
+    await Promise.all([
+      this.repository.deleteMany({ users: { $ind: userIds } }),
+      this.postRepository.deleteMany({ userId: { $ind: userIds } }),
+      this.postRepository.updateMany(
+        { 'comments.userId': { $ind: userIds } },
+        { $pull: { comments: { userId: { $ind: userIds } } } }
+      ),
+      this.postRepository.updateMany(
+        { 'reactions.userId': { $ind: userIds } },
+        { $pull: { reactions: { userId: { $ind: userIds } } } }
+      ),
+      this.postRepository.updateMany({ tags: { $ind: userIds } }, { $pull: { tags: { userId: { $ind: userIds } } } }),
+    ]);
     return {};
   }
 

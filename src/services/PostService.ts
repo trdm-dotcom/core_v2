@@ -44,6 +44,22 @@ export default class PostService {
     post.reactions = [];
     post.comments = [];
     await this.postRepository.save(post);
+    if (request.tags) {
+      request.tags.forEach((tag) => {
+        utils.sendMessagePushNotification(
+          `${transactionId}`,
+          tag,
+          `${request.headers.token.userData.name} tag you on post`,
+          'push_up',
+          FirebaseType.TOKEN,
+          true,
+          null,
+          'TAG',
+          post.id.toHexString(),
+          request.headers.token.userData.id
+        );
+      });
+    }
     return {};
   }
 
@@ -199,31 +215,41 @@ export default class PostService {
       userInfos.forEach((user) => {
         mapUsers.set(user.id, user);
       });
-      return posts.map((post: Post) => {
+      const responses: any[] = [];
+      posts.forEach((post: Post) => {
         const author = mapUsers.get(post.userId);
-        const tags = post.tags
-          ? post.tags.map((tag) => ({
-              id: tag,
-              name: mapUsers.get(tag) == null ? null : mapUsers.get(tag).name,
-              avatar: mapUsers.get(tag) == null ? null : mapUsers.get(tag).avatar,
-            }))
-          : [];
+        if (author && author.status == 'ACTIVE') {
+          const tags: any[] = [];
+          if (post.tags) {
+            post.tags.forEach((tag) => {
+              const tagUserInfo = mapUsers.get(tag);
+              if (tagUserInfo && tagUserInfo.status === 'ACTIVE') {
+                tags.push({
+                  id: tag,
+                  name: tagUserInfo.name,
+                  avatar: tagUserInfo.avatar,
+                });
+              }
+            });
+          }
 
-        return {
-          id: post.id,
-          source: post.source,
-          author: {
-            name: author?.name,
-            avatar: author?.avatar,
-            userId: post.userId,
-          },
-          tags: tags,
-          caption: post.caption,
-          createdAt: post.createdAt,
-          reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
-          comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
-        };
+          responses.push({
+            id: post.id,
+            source: post.source,
+            author: {
+              name: author?.name,
+              avatar: author?.avatar,
+              userId: post.userId,
+            },
+            tags: tags,
+            caption: post.caption,
+            createdAt: post.createdAt,
+            reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
+            comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
+          });
+        }
       });
+      return responses;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
@@ -288,23 +314,32 @@ export default class PostService {
         mapUsers.set(user.id, user);
       });
       const author = mapUsers.get(post.userId);
-      const tags = post.tags
-        ? post.tags.map((tag) => ({
-            id: tag,
-            name: mapUsers.get(tag) == null ? null : mapUsers.get(tag).name,
-            avatar: mapUsers.get(tag) == null ? null : mapUsers.get(tag).avatar,
-          }))
-        : [];
-      return {
-        id: post.id,
-        source: post.source,
-        author: author,
-        tags: tags,
-        caption: post.caption,
-        createdAt: post.createdAt,
-        reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
-        comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
-      };
+      if (author && author.status == 'ACTIVE') {
+        const tags: any[] = [];
+        if (post.tags) {
+          post.tags.forEach((tag) => {
+            const tagUserInfo = mapUsers.get(tag);
+            if (tagUserInfo && tagUserInfo.status === 'ACTIVE') {
+              tags.push({
+                id: tag,
+                name: tagUserInfo.name,
+                avatar: tagUserInfo.avatar,
+              });
+            }
+          });
+        }
+        return {
+          id: post.id,
+          source: post.source,
+          author: author,
+          tags: tags,
+          caption: post.caption,
+          createdAt: post.createdAt,
+          reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
+          comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
+        };
+      }
+      return {};
     } catch (err) {
       console.log(err);
       return {};
@@ -357,32 +392,15 @@ export default class PostService {
         },
       }
     );
-    utils.sendMessagePushNotification(
-      `${transactionId}`,
-      post.userId,
-      `${name} comment on your post`,
-      'push_up',
-      FirebaseType.TOKEN,
-      true,
-      null,
-      'COMMENT',
-      post.id.toHexString(),
-      userId
-    );
     const userInfosResponse: IMessage = await getInstance().sendRequestAsync(
       `${transactionId}`,
       'user',
-      'internal:/api/v1/userInfos',
+      'get:/api/v1/user/info',
       {
-        userIds: [request.headers.token.userData.id],
         headers: request.headers,
       }
     );
-    const userInfosData = Kafka.getResponse<any[]>(userInfosResponse);
-    const mapUserInfos: Map<number, any> = new Map();
-    userInfosData.forEach((info: any) => {
-      mapUserInfos.set(info.id, info);
-    });
+    const userInfosData = Kafka.getResponse<any>(userInfosResponse);
     this.publish(
       'comment',
       {
@@ -391,8 +409,8 @@ export default class PostService {
           id: comment._id.toHexString(),
           postId: request.postId,
           userId: comment.userId,
-          avatar: mapUserInfos.get(comment.userId).avatar,
-          name: mapUserInfos.get(comment.userId).name,
+          avatar: userInfosData.avatar,
+          name: userInfosData.name,
           comment: comment.comment,
           createdAt: comment.createdAt,
         },
@@ -408,6 +426,18 @@ export default class PostService {
         },
       },
       sourceId
+    );
+    utils.sendMessagePushNotification(
+      `${transactionId}`,
+      post.userId,
+      `${name} comment on your post`,
+      'push_up',
+      FirebaseType.TOKEN,
+      true,
+      null,
+      'COMMENT',
+      post.id.toHexString(),
+      userId
     );
     return {};
   }
@@ -496,22 +526,40 @@ export default class PostService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      return comments.map((comment: Comment) => ({
-        id: comment._id.toHexString(),
-        postId: request.postId,
-        userId: comment.userId,
-        avatar: mapUserInfos.get(comment.userId).avatar,
-        name: mapUserInfos.get(comment.userId).name,
-        comment: comment.comment,
-        commentReplies: comment.children?.map((reply) => ({
-          userId: reply.userId,
-          avatar: mapUserInfos.get(reply.userId).avatar,
-          name: mapUserInfos.get(reply.userId).name,
-          comment: reply.comment,
-          createdAt: reply.createdAt,
-        })),
-        createdAt: comment.createdAt,
-      }));
+      const responses: any[] = [];
+      comments.forEach((comment: Comment) => {
+        const userInfo = mapUserInfos.get(comment.userId);
+        if (userInfo && userInfo.status === 'ACTIVE') {
+          const response = {
+            id: comment._id.toHexString(),
+            postId: request.postId,
+            userId: comment.userId,
+            avatar: userInfo.avatar,
+            name: userInfo.name,
+            comment: comment.comment,
+            createdAt: comment.createdAt,
+          };
+          if (comment.children) {
+            const commentReplies: any[] = [];
+            comment.children.forEach((reply) => {
+              const userReplyInfo = mapUserInfos.get(reply.userId);
+              if (userReplyInfo && userReplyInfo.status === 'ACTIVE') {
+                commentReplies.push({
+                  id: comment._id.toHexString(),
+                  userId: reply.userId,
+                  avatar: userReplyInfo.avatar,
+                  name: userReplyInfo.name,
+                  comment: reply.comment,
+                  createdAt: reply.createdAt,
+                });
+              }
+            });
+            response['commentReplies'] = commentReplies;
+          }
+          responses.push(response);
+        }
+      });
+      return responses;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
@@ -582,14 +630,21 @@ export default class PostService {
       userInfosData.forEach((info: any) => {
         mapUserInfos.set(info.id, info);
       });
-      return reactions.map((reaction: Reaction) => ({
-        id: reaction._id.toHexString(),
-        userId: reaction.userId,
-        avatar: mapUserInfos.get(reaction.userId).avatar,
-        name: mapUserInfos.get(reaction.userId).name,
-        reaction: reaction.reaction,
-        createdAt: reaction.createdAt,
-      }));
+      const responses: any[] = [];
+      reactions.map((reaction: Reaction) => {
+        const userInfo = mapUserInfos.get(reaction.userId);
+        if (userInfo && userInfo.status === 'ACTIVE') {
+          responses.push({
+            id: reaction._id.toHexString(),
+            userId: reaction.userId,
+            avatar: userInfo.avatar,
+            name: userInfo.name,
+            reaction: reaction.reaction,
+            createdAt: reaction.createdAt,
+          });
+        }
+      });
+      return responses;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];

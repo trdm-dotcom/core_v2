@@ -9,14 +9,16 @@ export default class Conversation {
   id: ObjectID;
   @Column({ array: true })
   users: number[];
+  @Column()
+  sourceUser: number;
+  @Column()
+  targetUser: number;
   @Column((type) => Message, { array: true })
   messages: Message[];
-  @Column()
-  seen: boolean;
   @CreateDateColumn()
   createdAt: Date;
   @UpdateDateColumn()
   updatedAt: Date;
-  @Column('json')
-  deletedAt: { [userId: number]: Date };
+  @Column()
+  deletedAt: Date;
 }
