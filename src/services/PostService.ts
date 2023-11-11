@@ -35,6 +35,30 @@ export default class PostService {
     Utils.validate(request.hash, 'hash').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     utils.validHash(request.hash, 'UP_POST');
+    const imageModeration = await getInstance().sendRequestAsync(
+      `${transactionId}`,
+      'content-moderation',
+      'post:/api/v1/moderation/image',
+      {
+        imageData: request.source.replace(/^data:image\/\w+;base64,/, ''),
+        filename: 'image.jpg',
+      }
+    );
+    const imageModerationResult = Kafka.getResponse<any>(imageModeration);
+    Logger.info(`${transactionId} imageModeration`, imageModerationResult);
+    if (request.caption != null) {
+      const textModeration = await getInstance().sendRequestAsync(
+        `${transactionId}`,
+        'content-moderation',
+        'post:/api/v1/moderation/text',
+        {
+          text: request.caption,
+          mode: 'ml',
+        }
+      );
+      const textModerationResult = Kafka.getResponse<any>(textModeration);
+      Logger.info(`${transactionId} textModeration`, textModerationResult);
+    }
     const post: Post = new Post();
     post.userId = request.headers.token.userData.id;
     post.disable = false;
