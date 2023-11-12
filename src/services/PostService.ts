@@ -188,8 +188,8 @@ export default class PostService {
   }
 
   public async get(request: IPostRequest, transactionId: string | number) {
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const limit = request.pageSize == null ? 20 : Math.min(Number(request.pageSize), 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(Number(request.pageNumber), 0) * limit;
     const userId = request.headers.token.userData.id;
     try {
       const getFriendRequest = {
@@ -220,10 +220,8 @@ export default class PostService {
         take: limit,
       });
       const total: number = await this.postRepository.count({
-        where: {
-          userId: { $in: Array.from(setUserIds) },
-          disable: false,
-        },
+        userId: { $in: Array.from(setUserIds) },
+        disable: false,
       });
       posts.forEach((post) => {
         if (post.tags != null) {
@@ -265,12 +263,13 @@ export default class PostService {
           });
         }
       });
-      return {
+      const response = {
         total: total,
         datas: datas,
-        page: request.pageNumber,
+        page: Number(request.pageNumber),
         totalPages: Math.ceil(total / limit),
       };
+      return response;
     } catch (err) {
       Logger.error(`${transactionId} fail to send message`, err);
       return {
@@ -284,8 +283,8 @@ export default class PostService {
 
   async getPostByTag(request: IPostRequest, transactionId: string | number) {
     const userId = request.targetId != null ? request.targetId : request.headers.token.userData.id;
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const limit = request.pageSize == null ? 20 : Math.min(Number(request.pageSize), 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(Number(request.pageNumber), 0) * limit;
     const posts: Post[] = await this.postRepository.find({
       where: {
         tags: { $in: [Number(userId)] },
@@ -298,10 +297,8 @@ export default class PostService {
       take: limit,
     });
     const total: number = await this.postRepository.count({
-      where: {
-        tags: { $in: [Number(userId)] },
-        disable: false,
-      },
+      tags: { $in: [Number(userId)] },
+      disable: false,
     });
     const post = posts.map((post: Post) => {
       return {
@@ -312,15 +309,15 @@ export default class PostService {
     return {
       total: total,
       datas: post,
-      page: request.pageNumber,
+      page: Number(request.pageNumber),
       totalPages: Math.ceil(total / limit),
     };
   }
 
   async getHidePost(request: IPostRequest, transactionId: string | number) {
     const userId = request.headers.token.userData.id;
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const limit = request.pageSize == null ? 20 : Math.min(Number(request.pageSize), 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(Number(request.pageNumber), 0) * limit;
     const posts: Post[] = await this.postRepository.find({
       where: {
         userId: Number(userId),
@@ -333,10 +330,8 @@ export default class PostService {
       take: limit,
     });
     const total: number = await this.postRepository.count({
-      where: {
-        userId: Number(userId),
-        disable: true,
-      },
+      userId: Number(userId),
+      disable: true,
     });
     const post = posts.map((post: Post) => {
       return {
@@ -347,7 +342,7 @@ export default class PostService {
     return {
       total: total,
       datas: post,
-      page: request.pageNumber,
+      page: Number(request.pageNumber),
       totalPages: Math.ceil(total / limit),
     };
   }
@@ -356,8 +351,8 @@ export default class PostService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.targetId, 'targetId').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const limit = request.pageSize == null ? 20 : Math.min(Number(request.pageSize), 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(Number(request.pageNumber), 0) * limit;
     const posts: Post[] = await this.postRepository.find({
       where: {
         userId: Number(request.targetId),
@@ -370,10 +365,8 @@ export default class PostService {
       take: limit,
     });
     const total: number = await this.postRepository.count({
-      where: {
-        userId: Number(request.targetId),
-        disable: false,
-      },
+      userId: Number(request.targetId),
+      disable: false,
     });
     const post = posts.map((post: Post) => {
       return {
@@ -384,7 +377,7 @@ export default class PostService {
     return {
       total: total,
       datas: post,
-      page: request.pageNumber,
+      page: Number(request.pageNumber),
       totalPages: Math.ceil(total / limit),
     };
   }

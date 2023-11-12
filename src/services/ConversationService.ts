@@ -137,8 +137,8 @@ export default class ConversationService {
   }
 
   public async getConversations(request: IChatRequest, transactionId: string | number) {
-    const limit = request.pageSize == null ? 20 : Math.min(request.pageSize, 100);
-    const offset = request.pageNumber == null ? 0 : Math.max(request.pageNumber, 0) * limit;
+    const limit = request.pageSize == null ? 20 : Math.min(Number(request.pageSize), 100);
+    const offset = request.pageNumber == null ? 0 : Math.max(Number(request.pageNumber), 0) * limit;
     const userId = request.headers.token.userData.id;
     let filter: any = {
       $all: [userId],
@@ -180,11 +180,9 @@ export default class ConversationService {
       take: limit,
     });
     const total: number = await this.repository.count({
-      where: {
-        users: filter,
-        sourceUser: userId,
-        deletedAt: null,
-      },
+      users: filter,
+      sourceUser: userId,
+      deletedAt: null,
     });
     if (conversations.length <= 0) {
       return {
@@ -235,7 +233,7 @@ export default class ConversationService {
       return {
         total: total,
         datas: datas,
-        page: request.pageNumber,
+        page: Number(request.pageNumber),
         totalPages: Math.ceil(total / limit),
       };
     } catch (err) {
