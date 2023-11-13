@@ -19,6 +19,7 @@ import { IMessage } from 'kafka-common/build/src/modules/kafka';
 import { getInstance } from './KafkaProducerService';
 import { Kafka } from 'kafka-common';
 import { ObjectID } from 'mongodb';
+import * as twitter from 'twitter-text';
 
 @Service()
 export default class PostService {
@@ -46,44 +47,93 @@ export default class PostService {
     );
     const imageModerationResult = Kafka.getResponse<any>(imageModeration);
     Logger.info(`${transactionId} imageModeration`, imageModerationResult);
-    if (request.caption != null) {
+    let caption = request.caption;
+    const mentions: Set<number> = new Set();
+    const hashtags: Set<string> = new Set();
+    if (caption != null) {
+      caption = this.sanitise(caption);
       const textModeration = await getInstance().sendRequestAsync(
         `${transactionId}`,
         'content-moderation',
         'post:/api/v1/moderation/text',
         {
-          text: request.caption,
+          text: caption,
           mode: 'ml',
         }
       );
       const textModerationResult = Kafka.getResponse<any>(textModeration);
       Logger.info(`${transactionId} textModeration`, textModerationResult);
+      const extractHashtags = twitter.extractHashtags(caption).toLocaleString().toLowerCase();
+      if (extractHashtags.length > 0) {
+        extractHashtags.split(',').forEach((element) => {
+          hashtags.add(element);
+        });
+      }
+      const extractMentions = this.extractUserStrings(caption).toLocaleString().toLowerCase();
+      if (extractMentions.length > 0) {
+        extractMentions.split(',').forEach((element) => {
+          const mentionUserId = this.extractMentionUserId(element);
+          if (mentionUserId != null) {
+            mentions.add(mentionUserId);
+          }
+        });
+      }
     }
     const post: Post = new Post();
     post.userId = request.headers.token.userData.id;
     post.disable = false;
     post.source = request.source;
     post.tags = request.tags;
-    post.caption = request.caption;
+    post.caption = caption;
+    post.mentions = Array.from(mentions.values());
+    post.hashtags = Array.from(hashtags.values());
     post.reactions = [];
     post.comments = [];
     await this.postRepository.save(post);
+    const PromiseArray: Promise<any>[] = [];
     if (request.tags) {
       request.tags.forEach((tag) => {
-        utils.sendMessagePushNotification(
-          `${transactionId}`,
-          tag,
-          `${request.headers.token.userData.name} tag you on post`,
-          'push_up',
-          FirebaseType.TOKEN,
-          true,
-          null,
-          'TAG',
-          post.id.toHexString(),
-          request.headers.token.userData.id
+        PromiseArray.push(
+          new Promise((resolve) => {
+            utils.sendMessagePushNotification(
+              `${transactionId}`,
+              tag,
+              `${request.headers.token.userData.name} tag you on post`,
+              'push_up',
+              FirebaseType.TOKEN,
+              true,
+              null,
+              'TAG',
+              post.id.toHexString(),
+              request.headers.token.userData.id
+            );
+            resolve(null);
+          })
         );
       });
     }
+    if (mentions.size > 0) {
+      mentions.forEach((mention) => {
+        PromiseArray.push(
+          new Promise((resolve) => {
+            utils.sendMessagePushNotification(
+              `${transactionId}`,
+              mention,
+              `${request.headers.token.userData.name} mention you on post`,
+              'push_up',
+              FirebaseType.TOKEN,
+              true,
+              null,
+              'MENTION_ON_POST',
+              post.id.toHexString(),
+              request.headers.token.userData.id
+            );
+            resolve(null);
+          })
+        );
+      });
+    }
+    Promise.all(PromiseArray);
     return {};
   }
 
@@ -180,7 +230,70 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.update(post.id, { caption: request.caption, tags: request.tags });
+      let caption = request.caption;
+      const mentions: Set<number> = new Set(post.mentions ? post.mentions : []);
+      const hashtags: Set<string> = new Set(post.hashtags ? post.hashtags : []);
+      if (caption != null && caption != post.caption) {
+        caption = this.sanitise(caption);
+        const textModeration = await getInstance().sendRequestAsync(
+          `${transactionId}`,
+          'content-moderation',
+          'post:/api/v1/moderation/text',
+          {
+            text: caption,
+            mode: 'ml',
+          }
+        );
+        const textModerationResult = Kafka.getResponse<any>(textModeration);
+        Logger.info(`${transactionId} textModeration`, textModerationResult);
+        const extractHashtags = twitter.extractHashtags(caption).toLocaleString().toLowerCase();
+        if (extractHashtags.length > 0) {
+          extractHashtags.split(',').forEach((element) => {
+            hashtags.add(element);
+          });
+        }
+        const extractMentions = this.extractUserStrings(caption).toLocaleString().toLowerCase();
+        if (extractMentions.length > 0) {
+          extractMentions.split(',').forEach((element) => {
+            const mentionUserId = this.extractMentionUserId(element);
+            if (mentionUserId != null) {
+              mentions.add(mentionUserId);
+            }
+          });
+        }
+      } else {
+        mentions.clear();
+        hashtags.clear();
+      }
+      await this.postRepository.update(post.id, {
+        caption: caption,
+        mentions: Array.from(mentions.values()),
+        hashtags: Array.from(hashtags.values()),
+        tags: request.tags,
+      });
+      const PromiseArray: Promise<any>[] = [];
+      Array.from(mentions.values())
+        .filter((mention) => !post.mentions.includes(mention))
+        .forEach((mention) => {
+          PromiseArray.push(
+            new Promise((resolve) => {
+              utils.sendMessagePushNotification(
+                `${transactionId}`,
+                mention,
+                `${request.headers.token.userData.name} mention you on post`,
+                'push_up',
+                FirebaseType.TOKEN,
+                true,
+                null,
+                'MENTION_ON_POST',
+                post.id.toHexString(),
+                request.headers.token.userData.id
+              );
+              resolve(null);
+            })
+          );
+        });
+      Promise.all(PromiseArray);
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'MODIFY_POST', transactionId);
     }
@@ -468,23 +581,23 @@ export default class PostService {
     if (post == null) {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
-    let comment: Comment;
-    if (request.commentId != null) {
-      comment = post.comments.find((comment) => comment._id === new ObjectID(request.commentId));
-      const replyComment: Comment = new Comment();
-      replyComment._id = new ObjectID();
-      replyComment.userId = request.headers.token.userData.id;
-      replyComment.comment = this.sanitise(request.comment);
-      replyComment.parent = comment;
-      replyComment.createdAt = new Date();
-      comment.children.push(replyComment);
-    } else {
-      comment = new Comment();
-      comment._id = new ObjectID();
-      comment.userId = request.headers.token.userData.id;
-      comment.comment = this.sanitise(request.comment);
-      comment.createdAt = new Date();
+    const sanitisedComment = this.sanitise(request.comment);
+    const extractMentions = this.extractUserStrings(sanitisedComment).toLocaleString().toLowerCase();
+    const mentions: Set<number> = new Set();
+    if (extractMentions.length > 0) {
+      extractMentions.split(',').forEach((element) => {
+        const mentionUserId = this.extractMentionUserId(element);
+        if (mentionUserId != null) {
+          mentions.add(mentionUserId);
+        }
+      });
     }
+    const comment: Comment = new Comment();
+    comment._id = new ObjectID();
+    comment.userId = request.headers.token.userData.id;
+    comment.comment = sanitisedComment;
+    comment.createdAt = new Date();
+    comment.mentions = Array.from(mentions.values());
     this.postRepository.updateOne(
       {
         _id: new ObjectID(request.postId),
@@ -530,18 +643,45 @@ export default class PostService {
       },
       sourceId
     );
-    utils.sendMessagePushNotification(
-      `${transactionId}`,
-      post.userId,
-      `${name} comment on your post`,
-      'push_up',
-      FirebaseType.TOKEN,
-      true,
-      null,
-      'COMMENT',
-      post.id.toHexString(),
-      userId
-    );
+    const PromiseArray: Promise<any>[] = [
+      new Promise((resolve) => {
+        utils.sendMessagePushNotification(
+          `${transactionId}`,
+          post.userId,
+          `${name} comment on your post: ${sanitisedComment}`,
+          'push_up',
+          FirebaseType.TOKEN,
+          true,
+          null,
+          'COMMENT',
+          post.id.toHexString(),
+          userId
+        );
+        resolve(null);
+      }),
+    ];
+    if (mentions.size > 0) {
+      mentions.forEach((mention) => {
+        PromiseArray.push(
+          new Promise((resolve) => {
+            utils.sendMessagePushNotification(
+              `${transactionId}`,
+              mention,
+              `${name} mention you on comment: ${sanitisedComment}`,
+              'push_up',
+              FirebaseType.TOKEN,
+              true,
+              null,
+              'MENTION_ON_COMMENT',
+              post.id.toHexString(),
+              userId
+            );
+            resolve(null);
+          })
+        );
+      });
+    }
+    Promise.all(PromiseArray);
     return {};
   }
 
@@ -611,7 +751,6 @@ export default class PostService {
     const users: Set<number> = new Set();
     comments.forEach((comment: Comment) => {
       users.add(comment.userId);
-      comment.children?.forEach((reply) => users.add(reply.userId));
     });
     try {
       const userInfosRequest = {
@@ -642,23 +781,6 @@ export default class PostService {
             comment: comment.comment,
             createdAt: comment.createdAt,
           };
-          if (comment.children) {
-            const commentReplies: any[] = [];
-            comment.children.forEach((reply) => {
-              const userReplyInfo = mapUserInfos.get(reply.userId);
-              if (userReplyInfo && userReplyInfo.status === 'ACTIVE') {
-                commentReplies.push({
-                  id: comment._id.toHexString(),
-                  userId: reply.userId,
-                  avatar: userReplyInfo.avatar,
-                  name: userReplyInfo.name,
-                  comment: reply.comment,
-                  createdAt: reply.createdAt,
-                });
-              }
-            });
-            response['commentReplies'] = commentReplies;
-          }
           responses.push(response);
         }
       });
@@ -779,5 +901,29 @@ export default class PostService {
       data: data,
     };
     this.redisService.publish('gateway', outgoing);
+  }
+
+  private extractMentionUserId(username: string): number | null {
+    const regex = /\[([^\]]+)\]\((\d+)\)/g;
+    const matches = regex.exec(username);
+
+    if (matches && matches.length === 3) {
+      const userId = matches[2];
+      return Number(userId);
+    } else {
+      return null;
+    }
+  }
+
+  private extractUserStrings(input: string): string[] {
+    const regex = /\@\[([^\]]+)\]\((\d+)\)/g;
+    const matches: string[] = [];
+    let match;
+
+    while ((match = regex.exec(input)) !== null) {
+      matches.push(match[0]);
+    }
+
+    return matches;
   }
 }

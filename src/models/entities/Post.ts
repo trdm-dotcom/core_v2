@@ -20,6 +20,10 @@ export default class Post {
   reactions: Reaction[];
   @Column({ array: true })
   tags: number[];
+  @Column({ array: true })
+  hashtags: string[];
+  @Column({ array: true })
+  mentions: number[];
   @CreateDateColumn()
   createdAt: Date;
   @UpdateDateColumn()

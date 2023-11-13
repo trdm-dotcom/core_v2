@@ -14,6 +14,7 @@
   "dependencies": {
     "@types/crypto-js": "^4.1.1",
     "@types/redis": "^4.0.11",
+    "@types/twitter-text": "^3.1.8",
     "@types/uuid": "^8.3.4",
     "common": "file:../common",
     "crypto-js": "^4.1.1",
@@ -24,6 +25,7 @@
     "reflect-metadata": "^0.1.13",
     "ts-node": "^10.7.0",
     "tslib": "^2.4.0",
+    "twitter-text": "^3.1.0",
     "typedi": "^0.10.0",
     "typeorm": "^0.2.45",
     "typeorm-typedi-extensions": "^0.4.1",

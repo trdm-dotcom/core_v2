@@ -153,7 +153,7 @@ export default class ConversationService {
         const searchUserResponse: IMessage = await getInstance().sendRequestAsync(
           `${transactionId}`,
           'user',
-          'internal:/api/v1/user/search',
+          'get:/api/v1/user/friend/search',
           requestSearchUser
         );
         const data = Kafka.getResponse<any[]>(searchUserResponse);
