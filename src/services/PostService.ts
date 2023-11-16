@@ -417,6 +417,7 @@ export default class PostService {
       return {
         id: post.id,
         source: post.source,
+        userId: post.userId,
       };
     });
     return {
@@ -450,6 +451,7 @@ export default class PostService {
       return {
         id: post.id,
         source: post.source,
+        userId: post.userId,
       };
     });
     return {
@@ -485,6 +487,7 @@ export default class PostService {
       return {
         id: post.id,
         source: post.source,
+        userId: post.userId,
       };
     });
     return {

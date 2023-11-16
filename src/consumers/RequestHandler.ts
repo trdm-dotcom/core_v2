@@ -47,6 +47,9 @@ export default class RequestHandler {
         case 'get:/api/v1/social/post/hide':
           return this.postService.getHidePost(message.data, message.transactionId);
 
+        case 'get:/api/v1/social/post/user':
+          return this.postService.getPostOfUser(message.data, message.transactionId);
+
         case 'get:/api/v1/social/post/detail':
           return this.postService.getDetail(message.data, message.transactionId);
 
@@ -67,9 +70,6 @@ export default class RequestHandler {
 
         case 'get:/api/v1/social/post/reactions':
           return this.postService.getReactionsOfPost(message.data, message.transactionId);
-
-        case 'get:/api/v1/social/post/user':
-          return this.postService.getPostOfUser(message.data, message.transactionId);
 
         case 'post:/api/v1/chat/message':
           return this.conversationService.sendMessage(message.data, message.sourceId, message.transactionId);
