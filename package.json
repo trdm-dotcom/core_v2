@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "clean": "rm -rf build && mkdir build",
     "run-local": "node build/src/index.js",
     "build-local": "npm run build && node build/src/index.js",
-    "build": "tsc -p tsconfig.json"
+    "build": "npm run clean && tsc -p tsconfig.json"
   },
   "keywords": [],
   "author": "",
@@ -16,9 +17,9 @@
     "@types/redis": "^4.0.11",
     "@types/twitter-text": "^3.1.8",
     "@types/uuid": "^8.3.4",
-    "common": "file:../common",
+    "common": "git+https://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:x-oauth-basic@github.com/trdm-dotcom/common.git",
     "crypto-js": "^4.1.1",
-    "kafka-common": "file:../kafka-common",
+    "kafka-common": "git+https://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:x-oauth-basic@github.com/trdm-dotcom/kafka-common.git",
     "moment": "^2.29.4",
     "mongodb": "^3.6.0",
     "redis": "^4.1.0",
