@@ -137,7 +137,7 @@ export default class PostService {
     return {};
   }
 
-  public async delete(request: IDeletePostRequest, transactionId: string | number) {
+  public async delete(request: IDeletePostRequest, transactionId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.post, 'post').setRequire().throwValid(invalidParams);
     Utils.validate(request.hash, 'hash').setRequire().throwValid(invalidParams);
@@ -162,13 +162,20 @@ export default class PostService {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
       await this.postRepository.delete(post.id);
+      this.publish(
+        'post.deleteOrDisable',
+        {
+          to: post.id.toHexString(),
+        },
+        sourceId
+      );
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
     }
     return {};
   }
 
-  public async disable(request: IDeletePostRequest, transactionId: string | number) {
+  public async disable(request: IDeletePostRequest, transactionId: string | number, sourceId: string) {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.post, 'post').setRequire().throwValid(invalidParams);
     Utils.validate(request.hash, 'hash').setRequire().throwValid(invalidParams);
@@ -180,17 +187,16 @@ export default class PostService {
       where: {
         _id: new ObjectID(request.post),
         userId: userId,
-        disable: request.disable,
       },
     });
+    if (post == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
     try {
       while (await this.cacheService.findInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId)) {
         Logger.warn(`${transactionId} waiting do progess`);
       }
       this.cacheService.addInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);
-      if (post == null) {
-        throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
-      }
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
@@ -198,7 +204,16 @@ export default class PostService {
         {
           _id: new ObjectID(request.post),
         },
-        { disable: true }
+        { disable: request.disable }
+      );
+      this.publish(
+        'post.deleteOrDisable',
+        {
+          data: {
+            id: post.id.toHexString(),
+          },
+        },
+        sourceId
       );
     } finally {
       this.cacheService.removeInprogessValidate(request.post, 'DELETE_DISABLE_POST', transactionId);

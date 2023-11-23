@@ -33,7 +33,7 @@ export default class RequestHandler {
           return this.postService.store(message.data, message.transactionId);
 
         case 'delete:/api/v1/social/post':
-          return this.postService.delete(message.data, message.transactionId);
+          return this.postService.delete(message.data, message.transactionId, message.sourceId);
 
         case 'put:/api/v1/social/post':
           return this.postService.update(message.data, message.transactionId);
@@ -54,7 +54,7 @@ export default class RequestHandler {
           return this.postService.getDetail(message.data, message.transactionId);
 
         case 'put:/api/v1/social/post/disable':
-          return this.postService.disable(message.data, message.transactionId);
+          return this.postService.disable(message.data, message.transactionId, message.sourceId);
 
         case 'post:/api/v1/social/comment':
           return this.postService.comment(message.data, message.transactionId, message.sourceId);
