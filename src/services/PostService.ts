@@ -172,6 +172,7 @@ export default class PostService {
     const invalidParams = new Errors.InvalidParameterError();
     Utils.validate(request.post, 'post').setRequire().throwValid(invalidParams);
     Utils.validate(request.hash, 'hash').setRequire().throwValid(invalidParams);
+    Utils.validate(request.disable, 'disable').setRequire().throwValid(invalidParams);
     invalidParams.throwErr();
     utils.validHash(request.hash, 'DISABLE_POST');
     const userId = request.headers.token.userData.id;
@@ -179,6 +180,7 @@ export default class PostService {
       where: {
         _id: new ObjectID(request.post),
         userId: userId,
+        disable: request.disable,
       },
     });
     try {
@@ -554,6 +556,7 @@ export default class PostService {
           tags: tags,
           caption: post.caption,
           createdAt: post.createdAt,
+          disable: post.disable,
           reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
           comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
         };
