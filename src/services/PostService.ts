@@ -535,6 +535,11 @@ export default class PostService {
           userIds.add(element);
         });
       }
+      if (post.comments != null) {
+        post.comments.forEach((element) => {
+          userIds.add(element.userId);
+        });
+      }
       const getUserInfosRequest = {
         userIds: Array.from(userIds.values()),
       };
@@ -564,6 +569,23 @@ export default class PostService {
             }
           });
         }
+        const comments: any[] = [];
+        if (post.comments != null) {
+          post.comments.forEach((comment: Comment) => {
+            const userInfo = mapUsers.get(comment.userId);
+            if (userInfo && userInfo.status === 'ACTIVE') {
+              comments.push({
+                id: comment._id.toHexString(),
+                postId: post.id.toHexString(),
+                userId: comment.userId,
+                avatar: userInfo.avatar,
+                name: userInfo.name,
+                comment: comment.comment,
+                createdAt: comment.createdAt,
+              });
+            }
+          });
+        }
         return {
           id: post.id,
           source: post.source,
@@ -572,8 +594,8 @@ export default class PostService {
           caption: post.caption,
           createdAt: post.createdAt,
           disable: post.disable,
-          reactions: post.reactions ? post.reactions.map((reaction) => reaction.userId) : [],
-          comments: post.comments ? post.comments.map((comment) => comment.userId) : [],
+          reactions: post.reactions != null ? post.reactions.map((reaction) => reaction.userId) : [],
+          comments: comments,
         };
       }
       return {};
