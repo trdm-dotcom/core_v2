@@ -204,7 +204,7 @@ export default class PostService {
         {
           _id: new ObjectID(request.post),
         },
-        { disable: request.disable }
+        { $set: { disable: request.disable } }
       );
       this.publish(
         'post.deleteOrDisable',
