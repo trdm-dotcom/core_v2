@@ -522,7 +522,6 @@ export default class PostService {
     const post: Post = await this.postRepository.findOne({
       where: {
         _id: new ObjectID(request.post),
-        disable: false,
       },
     });
     if (post == null) {
