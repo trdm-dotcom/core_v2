@@ -56,19 +56,19 @@ export default class ConversationService {
     let conversations: Conversation[] = await this.repository.find({
       where: {
         users: {
-          $all: [userId, request.recipientId],
+          $all: [userId, Number(request.recipientId)],
         },
       },
     });
     Logger.info(`${transactionId} conversations`, conversations);
     if (conversations.length <= 0) {
       const source: Conversation = new Conversation();
-      source.users = [userId, request.recipientId];
+      source.users = [userId, Number(request.recipientId)];
       source.sourceUser = userId;
-      source.targetUser = request.recipientId;
+      source.targetUser = Number(request.recipientId);
       const target: Conversation = new Conversation();
-      target.users = [userId, request.recipientId];
-      target.sourceUser = request.recipientId;
+      target.users = [userId, Number(request.recipientId)];
+      target.sourceUser = Number(request.recipientId);
       target.targetUser = userId;
       await this.repository.save([source, target]);
     }
@@ -81,7 +81,7 @@ export default class ConversationService {
     await this.repository.updateMany(
       {
         users: {
-          $all: [userId, request.recipientId],
+          $all: [userId, Number(request.recipientId)],
         },
       },
       {
@@ -96,7 +96,7 @@ export default class ConversationService {
     this.publish(
       'receive-message',
       {
-        to: request.recipientId,
+        to: Number(request.recipientId),
         data: {
           _id: message._id.toHexString(),
           user: {
@@ -112,7 +112,7 @@ export default class ConversationService {
     this.publish(
       'show.room',
       {
-        to: request.recipientId,
+        to: Number(request.recipientId),
         data: {
           id: userId,
           users: {
@@ -126,7 +126,7 @@ export default class ConversationService {
     );
     utils.sendMessagePushNotification(
       `${transactionId}`,
-      request.recipientId,
+      Number(request.recipientId),
       `${this.sanitise(request.message)} `,
       'push_up',
       FirebaseType.TOKEN,
@@ -255,7 +255,7 @@ export default class ConversationService {
     const conversation: Conversation = await this.repository.findOne({
       where: {
         sourceUser: userId,
-        targetUser: request.recipientId,
+        targetUser: Number(request.recipientId),
       },
     });
     if (conversation == null) {
@@ -285,7 +285,7 @@ export default class ConversationService {
         $all: [userId, Number(request.recipientId)],
       },
     });
-    this.publish('delete.room', { to: request.recipientId, data: { id: userId } }, sourceId);
+    this.publish('delete.room', { to: Number(request.recipientId), data: { id: userId } }, sourceId);
     return {};
   }
 
