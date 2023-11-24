@@ -89,7 +89,7 @@ export default class PostService {
     post.hashtags = Array.from(hashtags.values());
     post.reactions = [];
     post.comments = [];
-    await this.postRepository.save(post);
+    const postEntity: Post = await this.postRepository.save(post);
     const PromiseArray: Promise<any>[] = [];
     if (request.tags) {
       request.tags.forEach((tag) => {
@@ -134,7 +134,10 @@ export default class PostService {
       });
     }
     Promise.all(PromiseArray);
-    return {};
+    return {
+      id: postEntity.id.toHexString(),
+      createdAt: postEntity.createdAt,
+    };
   }
 
   public async delete(request: IDeletePostRequest, transactionId: string | number, sourceId: string) {
