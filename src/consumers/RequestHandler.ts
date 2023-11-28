@@ -92,6 +92,9 @@ export default class RequestHandler {
         case 'get:/api/v1/chat/conversation/between':
           return this.conversationService.getConversationBetween(message.data, message.transactionId);
 
+        case 'post:/api/v1/report': 
+          return this.postService.report(message.data, message.transactionId);
+            
         default:
           throw new UriNotFound();
       }

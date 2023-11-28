@@ -1,6 +1,7 @@
 import { Inject, Service } from 'typedi';
 import IPostRequest from '../models/request/IPostRequest';
 import Post from '../models/entities/Post';
+import Report from '../models/entities/Report';
 import { Errors, Logger, Utils } from 'common';
 import * as utils from '../utils/Utils';
 import IDeletePostRequest from '../models/request/IDeletePostRequest';
@@ -20,6 +21,7 @@ import { getInstance } from './KafkaProducerService';
 import { Kafka } from 'kafka-common';
 import { ObjectID } from 'mongodb';
 import * as twitter from 'twitter-text';
+import { IReportRequest } from '../models/request/IReportRequest';
 
 @Service()
 export default class PostService {
@@ -29,6 +31,8 @@ export default class PostService {
   private redisService: RedisService;
   @InjectRepository(Post)
   private postRepository: MongoRepository<Post>;
+  @InjectRepository(Report)
+  private reportRepository: MongoRepository<Report>;
 
   public async store(request: IPostRequest, transactionId: string | number) {
     const invalidParams = new Errors.InvalidParameterError();
@@ -920,6 +924,27 @@ export default class PostService {
       Logger.error(`${transactionId} fail to send message`, err);
       return [];
     }
+  }
+
+  public async report(request: IReportRequest, transactionId: string | number) {
+    const invalidParams = new Errors.InvalidParameterError();
+    Utils.validate(request.sourceId, 'sourceId').setRequire().throwValid(invalidParams);
+    Utils.validate(request.reason, 'reason').setRequire().throwValid(invalidParams);
+    invalidParams.throwErr();
+    const post: Post = await this.postRepository.findOne({
+      where: {
+        _id: new ObjectID(request.sourceId),
+        disable: false,
+      },
+    });
+    if (post == null) {
+      throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
+    }
+    const report: Report = new Report();
+    report.source = post;
+    report.reason = request.reason;
+    await this.reportRepository.save(report);
+    return {};
   }
 
   private sanitise(text: string) {
