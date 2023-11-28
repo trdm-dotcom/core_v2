@@ -356,13 +356,6 @@ export default class PostService {
         userId: { $in: Array.from(setUserIds) },
         disable: false,
       });
-      posts.forEach((post) => {
-        if (post.tags != null) {
-          post.tags.forEach((element) => {
-            setUserIds.add(element);
-          });
-        }
-      });
       const datas: any[] = [];
       posts.forEach((post: Post) => {
         const author = mapUsers.get(post.userId);
