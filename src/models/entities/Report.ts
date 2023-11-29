@@ -6,7 +6,7 @@ export default class Report {
   @ObjectIdColumn()
   id: ObjectID;
   @Column((type) => Post)
-  source: Post;
+  post: Post;
   @Column()
   reason: string;
   @CreateDateColumn()

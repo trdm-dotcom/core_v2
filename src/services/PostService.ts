@@ -941,7 +941,7 @@ export default class PostService {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
     const report: Report = new Report();
-    report.source = post;
+    report.post = post;
     report.reason = request.reason;
     await this.reportRepository.save(report);
     return {};
