@@ -345,21 +345,64 @@ export default class PostService {
         setUserIds.add(friend.id);
         mapUsers.set(friend.id, friend);
       });
-      const posts: Post[] = await this.postRepository.find({
-        where: {
-          userId: { $in: Array.from(setUserIds) },
-          disable: false,
-        },
-        order: {
-          createdAt: 'DESC',
-        },
-        skip: offset,
-        take: limit,
-      });
-      const total: number = await this.postRepository.count({
-        userId: { $in: Array.from(setUserIds) },
-        disable: false,
-      });
+      const posts: Post[] = await this.postRepository
+        .aggregate([
+          {
+            $match: {
+              userId: { $in: Array.from(setUserIds) },
+              disable: false,
+            },
+          },
+          {
+            $lookup: {
+              from: 'report',
+              localField: '_id',
+              foreignField: 'post.id',
+              as: 'reports',
+            },
+          },
+          {
+            $match: {
+              reports: { $eq: [] },
+            },
+          },
+          {
+            $sort: {
+              createdAt: -1,
+            },
+          },
+          {
+            $skip: offset,
+          },
+          {
+            $limit: limit,
+          },
+        ])
+        .toArray();
+      const result = await this.postRepository
+        .aggregate([
+          {
+            $match: {
+              userId: { $in: Array.from(setUserIds) },
+              disable: false,
+            },
+          },
+          {
+            $lookup: {
+              from: 'report',
+              localField: '_id',
+              foreignField: 'post.id',
+              as: 'reports',
+            },
+          },
+          {
+            $match: {
+              reports: { $eq: [] },
+            },
+          },
+        ])
+        .toArray();
+      const total: number = result.length;
       const datas: any[] = [];
       posts.forEach((post: Post) => {
         const author = mapUsers.get(post.userId);
@@ -941,10 +984,26 @@ export default class PostService {
       throw new Errors.GeneralError(Constants.OBJECT_NOT_FOUND);
     }
     const report: Report = new Report();
-    report.post = post;
+    report.userId = request.headers.token.userData.id;
+    report.post = {
+      ...post,
+      _id: post.id,
+    };
     report.reason = request.reason;
+    report.status = 'pending';
     await this.reportRepository.save(report);
     return {};
+  }
+
+  public async internalDelete(request: IDeletePostRequest, transactionId: string | number) {
+    await this.postRepository.delete(new ObjectID(request.post));
+    this.publish(
+      'post.deleteOrDisable',
+      {
+        to: request.post,
+      },
+      'gateway-0'
+    );
   }
 
   private sanitise(text: string) {

@@ -1,12 +1,15 @@
 import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateColumn } from 'typeorm';
-import Post from './Post';
 
 @Entity()
 export default class Report {
   @ObjectIdColumn()
   id: ObjectID;
-  @Column((type) => Post)
-  post: Post;
+  @Column()
+  userId: number;
+  @Column()
+  status: string;
+  @Column()
+  post: any;
   @Column()
   reason: string;
   @CreateDateColumn()
