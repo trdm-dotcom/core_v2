@@ -988,7 +988,8 @@ export default class PostService {
     report.post = post;
     report.reason = request.reason;
     report.status = 'pending';
-    await this.reportRepository.save(report);
+    const reportEntity: Report = await this.reportRepository.save(report);
+    this.publish('post.report', reportEntity, 'gateway-0');
     return {};
   }
 
