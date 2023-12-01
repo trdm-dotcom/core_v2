@@ -108,7 +108,7 @@ export default class PostService {
               true,
               null,
               'TAG',
-              post.id.toHexString(),
+              post._id.toHexString(),
               request.headers.token.userData.id
             );
             resolve(null);
@@ -129,7 +129,7 @@ export default class PostService {
               true,
               null,
               'MENTION_ON_POST',
-              post.id.toHexString(),
+              post._id.toHexString(),
               request.headers.token.userData.id
             );
             resolve(null);
@@ -139,7 +139,7 @@ export default class PostService {
     }
     Promise.all(PromiseArray);
     return {
-      id: postEntity.id.toHexString(),
+      id: postEntity._id.toHexString(),
       createdAt: postEntity.createdAt,
     };
   }
@@ -168,11 +168,11 @@ export default class PostService {
       if (post.userId != userId) {
         throw new Errors.GeneralError(Constants.USER_DONT_HAVE_PERMISSION);
       }
-      await this.postRepository.delete(post.id);
+      await this.postRepository.delete(post._id);
       this.publish(
         'post.deleteOrDisable',
         {
-          to: post.id.toHexString(),
+          to: post._id.toHexString(),
         },
         sourceId
       );
@@ -217,7 +217,7 @@ export default class PostService {
         'post.deleteOrDisable',
         {
           data: {
-            id: post.id.toHexString(),
+            id: post._id.toHexString(),
           },
         },
         sourceId
@@ -289,7 +289,7 @@ export default class PostService {
         mentions.clear();
         hashtags.clear();
       }
-      await this.postRepository.update(post.id, {
+      await this.postRepository.update(post._id, {
         caption: caption,
         mentions: Array.from(mentions.values()),
         hashtags: Array.from(hashtags.values()),
@@ -310,7 +310,7 @@ export default class PostService {
                 true,
                 null,
                 'MENTION_ON_POST',
-                post.id.toHexString(),
+                post._id.toHexString(),
                 request.headers.token.userData.id
               );
               resolve(null);
@@ -421,7 +421,7 @@ export default class PostService {
             });
           }
           datas.push({
-            id: post.id,
+            id: post._id,
             source: post.source,
             author: {
               name: author?.name,
@@ -475,7 +475,7 @@ export default class PostService {
     });
     const post = posts.map((post: Post) => {
       return {
-        id: post.id,
+        id: post._id,
         source: post.source,
         userId: post.userId,
       };
@@ -509,7 +509,7 @@ export default class PostService {
     });
     const post = posts.map((post: Post) => {
       return {
-        id: post.id,
+        id: post._id,
         source: post.source,
         userId: post.userId,
       };
@@ -545,7 +545,7 @@ export default class PostService {
     });
     const post = posts.map((post: Post) => {
       return {
-        id: post.id,
+        id: post._id,
         source: post.source,
         userId: post.userId,
       };
@@ -618,7 +618,7 @@ export default class PostService {
             if (userInfo && userInfo.status === 'ACTIVE') {
               comments.push({
                 id: comment._id.toHexString(),
-                postId: post.id.toHexString(),
+                postId: post._id.toHexString(),
                 userId: comment.userId,
                 avatar: userInfo.avatar,
                 name: userInfo.name,
@@ -629,7 +629,7 @@ export default class PostService {
           });
         }
         return {
-          id: post.id,
+          id: post._id,
           source: post.source,
           author: author,
           tags: tags,
@@ -705,7 +705,7 @@ export default class PostService {
     this.publish(
       'comment',
       {
-        to: post.id.toHexString(),
+        to: post._id.toHexString(),
         data: {
           id: comment._id.toHexString(),
           postId: request.postId,
@@ -721,7 +721,7 @@ export default class PostService {
     this.publish(
       'post.comment',
       {
-        to: post.id.toHexString(),
+        to: post._id.toHexString(),
         data: {
           comments: [comment.userId],
         },
@@ -739,7 +739,7 @@ export default class PostService {
           true,
           null,
           'COMMENT',
-          post.id.toHexString(),
+          post._id.toHexString(),
           userId
         );
         resolve(null);
@@ -758,7 +758,7 @@ export default class PostService {
               true,
               null,
               'MENTION_ON_COMMENT',
-              post.id.toHexString(),
+              post._id.toHexString(),
               userId
             );
             resolve(null);
@@ -812,10 +812,10 @@ export default class PostService {
       true,
       null,
       'LIKE',
-      post.id.toHexString(),
+      post._id.toHexString(),
       userId
     );
-    this.publish('post.reaction', { to: post.id.toHexString(), data: { reactions: [userId] } }, sourceId);
+    this.publish('post.reaction', { to: post._id.toHexString(), data: { reactions: [userId] } }, sourceId);
     return {};
   }
 
@@ -906,7 +906,7 @@ export default class PostService {
     this.publish(
       'delete.comment',
       {
-        to: post.id.toHexString(),
+        to: post._id.toHexString(),
         id: request.commentId,
       },
       sourceId
@@ -985,10 +985,7 @@ export default class PostService {
     }
     const report: Report = new Report();
     report.userId = request.headers.token.userData.id;
-    report.post = {
-      ...post,
-      _id: post.id,
-    };
+    report.post = post;
     report.reason = request.reason;
     report.status = 'pending';
     await this.reportRepository.save(report);

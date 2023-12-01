@@ -3,7 +3,7 @@ import { Column, CreateDateColumn, Entity, ObjectID, ObjectIdColumn, UpdateDateC
 @Entity()
 export default class Report {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
   @Column()
   userId: number;
   @Column()

@@ -5,7 +5,7 @@ import Comment from './Comment';
 @Entity()
 export default class Post {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
   @Column()
   userId: number;
   @Column()

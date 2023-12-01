@@ -224,7 +224,7 @@ export default class ConversationService {
             }
           });
           datas.push({
-            id: conversation.id,
+            id: conversation._id,
             users: userInfos,
             lastMessage: conversation.messages[conversation.messages.length - 1],
           });
@@ -263,7 +263,7 @@ export default class ConversationService {
     }
     await this.repository.updateOne(
       {
-        _id: conversation.id,
+        _id: conversation._id,
       },
       {
         $set: {
@@ -396,6 +396,6 @@ export default class ConversationService {
         },
       },
     });
-    return { chatId: conversations != null ? conversations.id : null };
+    return { chatId: conversations != null ? conversations._id : null };
   }
 }

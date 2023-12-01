@@ -6,7 +6,7 @@ import { Message } from './Message';
 @Entity()
 export default class Conversation {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
   @Column({ array: true })
   users: number[];
   @Column()
