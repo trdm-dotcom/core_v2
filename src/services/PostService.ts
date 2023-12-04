@@ -356,14 +356,26 @@ export default class PostService {
           {
             $lookup: {
               from: 'report',
-              localField: '_id',
-              foreignField: 'post.id',
+              let: { postId: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$post._id', '$$postId'] },
+                        { $eq: ['$userId', userId] },
+                        { $ne: ['$status', 'rejected'] },
+                      ],
+                    },
+                  },
+                },
+              ],
               as: 'reports',
             },
           },
           {
             $match: {
-              reports: { $eq: [] },
+              'reports._id': { $exists: false },
             },
           },
           {
@@ -390,14 +402,26 @@ export default class PostService {
           {
             $lookup: {
               from: 'report',
-              localField: '_id',
-              foreignField: 'post.id',
+              let: { postId: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$post._id', '$$postId'] },
+                        { $eq: ['$userId', userId] },
+                        { $ne: ['$status', 'rejected'] },
+                      ],
+                    },
+                  },
+                },
+              ],
               as: 'reports',
             },
           },
           {
             $match: {
-              reports: { $eq: [] },
+              'reports._id': { $exists: false },
             },
           },
         ])
